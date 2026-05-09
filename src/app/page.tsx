@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Newspaper, RefreshCw, Sparkles, Leaf, Zap } from 'lucide-react';
 import { NewsCard, NewsCardSkeleton, NewsEmpty } from '@/components/ui/NewsCard';
 import { GreenChatbot } from '@/components/ui/GreenChatbot';
@@ -70,13 +71,17 @@ export default function HomePage() {
           </div>
           
           {/* 右侧头像 */}
-          <div className="flex-shrink-0 animate-float">
-            <div className="avatar-glow">
-              <div className="avatar-glow-placeholder">
-                🌿
-              </div>
+          <div className="flex-shrink-0 animate-float text-center">
+            <div className="avatar-glow inline-block">
+              <Image
+                src="/images/avatar-green.jpg"
+                alt="绿·AI资讯助手"
+                width={150}
+                height={150}
+                className="w-[150px] h-[150px] rounded-full object-cover border-4 border-white/80 dark:border-white/20"
+              />
             </div>
-            <p className="text-center mt-3 text-sm text-muted-foreground">
+            <p className="mt-3 text-sm text-muted-foreground">
               绿 · AI资讯助手
             </p>
           </div>
