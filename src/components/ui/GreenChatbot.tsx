@@ -16,13 +16,6 @@ const quickQuestions = [
   '帮我总结本周资讯',
 ];
 
-// 模拟回复
-const mockResponses: Record<string, string> = {
-  '今天有什么AI大事？': '今天AI圈有几个重磅消息！首先是OpenAI发布了GPT-5，性能大幅提升。另外Google也开源了Gemma 3系列模型，性价比很高哦！🌟',
-  '最新大模型排行': '根据最新数据，目前综合能力最强的是GPT-5和Claude 4。在开源模型中，Llama 4和Qwen2.5表现也很出色。需要看具体维度的排名吗？',
-  '帮我总结本周资讯': '本周AI圈最热门的是GPT-5和Claude 4同日发布，标志着AI竞争进入新阶段。此外还有多个开源模型发布，包括Gemma 3和Llama 4多模态版。整体来看，多模态能力和长上下文是近期重点方向。',
-};
-
 function generateId() {
   return Math.random().toString(36).substring(2, 9);
 }
@@ -38,15 +31,14 @@ export function GreenChatbot() {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // 自动滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
   
-  // 发送消息
-  const sendMessage = (content: string) => {
+  const sendMessage = async (content: string) => {
     if (!content.trim()) return;
     
     const userMessage: Message = {
@@ -57,19 +49,49 @@ export function GreenChatbot() {
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsTyping(true);
+    setError(null);
     
-    setTimeout(() => {
-      const response = mockResponses[content] || 
-        '这个问题我还需要学习一下才能回答哦！建议你直接浏览今天的资讯卡片获取最新信息 🌱';
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            ...messages.filter(m => m.id !== 'welcome').map(m => ({
+              role: m.role,
+              content: m.content,
+            })),
+            { role: 'user', content },
+          ],
+        }),
+      });
+      
+      const data = await response.json();
       
       const assistantMessage: Message = {
         id: generateId(),
         role: 'assistant',
-        content: response,
+        content: data.message || data.error?.message || '抱歉，我现在有点忙，稍后再试试 🌱',
       };
       setMessages(prev => [...prev, assistantMessage]);
+      
+      if (data.error && !data.message) {
+        setError(data.error);
+      }
+    } catch (err) {
+      console.error('Chat API error:', err);
+      const assistantMessage: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: '网络连接出了问题，请检查网络后重试 🌿',
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      setError('Network error');
+    } finally {
       setIsTyping(false);
-    }, 800 + Math.random() * 500);
+    }
   };
   
   const handleQuickQuestion = (question: string) => {
@@ -85,7 +107,6 @@ export function GreenChatbot() {
   
   return (
     <>
-      {/* 触发按钮 - 圆形头像版 */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="chatbot-trigger"
@@ -111,7 +132,7 @@ export function GreenChatbot() {
           </>
         )}
       </button>
-     
+    
       {isOpen && (
         <div className="chatbot-window">
           <div className="chatbot-header">
@@ -156,6 +177,14 @@ export function GreenChatbot() {
                   <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                   <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
+              </div>
+            )}
+            
+            {error && (
+              <div className="chat-message bot text-xs text-amber-600 dark:text-amber-400">
+                提示: {error.includes('503') || error.includes('not configured') 
+                  ? 'AI助手正在准备中，请稍后再试' 
+                  : '发生了一些问题，但我会继续努力 🌿'}
               </div>
             )}
             
