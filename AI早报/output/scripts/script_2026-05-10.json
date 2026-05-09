@@ -1,0 +1,47 @@
+{
+  "opening": "🌿 嘿！小伙伴们早上好！欢迎来到新叶早报~ 我是绿~ 2026年05月10日 周日，元气满满的一天从AI资讯开始！✨",
+  "items": [
+    {
+      "title": "两项AI政策发布，范式智能战略布局与产业方向高度契合",
+      "script": "今天的第1条资讯是：两项AI政策发布，范式智能战略布局与产业方向高度契合。围绕电力交易、能源调度、智能预测与决策等场景探索AI应用落地...",
+      "duration": 20
+    },
+    {
+      "title": "不更新参数就能强化学习！OpenAI翁家翌提出新范式：决策只需AI手搓一个.py 文件",
+      "script": "今天的第2条资讯是：不更新参数就能强化学习！OpenAI翁家翌提出新范式：决策只需AI手搓一个.py 文件。实现过程开源可复现...",
+      "duration": 20
+    },
+    {
+      "title": "谷歌「AI联合数学家」来了！刷新最难数学AI基准SOTA，牛津教授用它解开群论悬案",
+      "script": "今天的第3条资讯是：谷歌「AI联合数学家」来了！刷新最难数学AI基准SOTA，牛津教授用它解开群论悬案。谷歌AI for Math迈出最新一步...",
+      "duration": 20
+    },
+    {
+      "title": "百度发布文心 5.1：搜索能力登顶国内，预训练成本仅为业界 6%",
+      "script": "今天的第4条资讯是：百度发布文心 5.1：搜索能力登顶国内，预训练成本仅为业界 6%。搜索、知识、Agent 能力全面提升...",
+      "duration": 20
+    },
+    {
+      "title": "Running Codex safely at OpenAI",
+      "script": "今天的第5条资讯是：Running Codex safely at OpenAI。How OpenAI runs Codex securely with sandboxing, approvals, network policies, and agent-native teleme...",
+      "duration": 20
+    },
+    {
+      "title": "Scaling Trusted Access for Cyber with GPT-5.5 and GPT-5.5-Cyber",
+      "script": "今天的第6条资讯是：Scaling Trusted Access for Cyber with GPT-5.5 and GPT-5.5-Cyber。OpenAI expands Trusted Access for Cyber with GPT-5.5 and GPT-5.5-Cyber, helping verified defenders a...",
+      "duration": 20
+    },
+    {
+      "title": "Simplex rethinks software development with Codex",
+      "script": "今天的第7条资讯是：Simplex rethinks software development with Codex。Simplex boosts software development with ChatGPT Enterprise and Codex, reducing design, build, and t...",
+      "duration": 20
+    },
+    {
+      "title": "太初元碁携龙虾一体机亮相北京科博会",
+      "script": "今天的第8条资讯是：太初元碁携龙虾一体机亮相北京科博会。...",
+      "duration": 20
+    }
+  ],
+  "closing": "🌿 以上就是今天的AI资讯啦！记得明天同一时间来看绿哦~ 我们明天见！拜拜~ 👋",
+  "total_duration": 185
+}
