@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Home, BarChart3, Archive, Info, Leaf } from 'lucide-react';
+import { Home, BarChart3, Archive, Info } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 const navItems = [
@@ -17,30 +18,37 @@ export function Navbar() {
   
   return (
     <header className="sticky top-0 z-50">
-      {/* 毛玻璃背景导航栏 */}
-      <nav className="glass-card border-b border-border/50">
+      {/* 毛玻璃背景导航栏 - 增强版 */}
+      <nav className="navbar-glass">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Leaf className="w-5 h-5 text-white" />
+            {/* Logo区域 - 圆形头像+文字 */}
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="navbar-avatar-container">
+                <Image
+                  src="/images/avatar-green.jpg"
+                  alt="新叶AI Logo"
+                  width={36}
+                  height={36}
+                  className="navbar-avatar"
+                />
+                <div className="navbar-avatar-glow" />
               </div>
-              <span className="text-lg font-bold text-foreground">
+              <span className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
                 新叶AI
               </span>
             </Link>
             
-            {/* 导航链接 - 桌面端 */}
-            <div className="hidden md:flex items-center gap-1">
+            {/* 导航链接 - 桌面端增强版 */}
+            <div className="hidden md:flex items-center gap-2">
               {navItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`nav-link px-4 py-2 rounded-lg ${
-                      isActive ? 'nav-link-active font-medium' : ''
+                    className={`nav-link-enhanced px-4 py-2 rounded-lg ${
+                      isActive ? 'nav-link-active-enhanced font-medium' : ''
                     }`}
                   >
                     {item.label}

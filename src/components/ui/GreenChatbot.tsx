@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { X, Send, MessageCircle } from 'lucide-react';
+import Image from 'next/image';
+import { X, Send } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -48,7 +49,6 @@ export function GreenChatbot() {
   const sendMessage = (content: string) => {
     if (!content.trim()) return;
     
-    // 添加用户消息
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
@@ -58,7 +58,6 @@ export function GreenChatbot() {
     setInputValue('');
     setIsTyping(true);
     
-    // 模拟回复
     setTimeout(() => {
       const response = mockResponses[content] || 
         '这个问题我还需要学习一下才能回答哦！建议你直接浏览今天的资讯卡片获取最新信息 🌱';
@@ -86,7 +85,7 @@ export function GreenChatbot() {
   
   return (
     <>
-      {/* 触发按钮 */}
+      {/* 触发按钮 - 圆形头像版 */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="chatbot-trigger"
@@ -96,24 +95,36 @@ export function GreenChatbot() {
           <X className="w-6 h-6 text-white" />
         ) : (
           <>
-            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
-              <span className="text-2xl">🌿</span>
+            <div className="chatbot-avatar-wrapper">
+              <Image
+                src="/images/avatar-green.jpg"
+                alt="绿"
+                width={40}
+                height={40}
+                className="chatbot-avatar-btn"
+              />
+              <div className="chatbot-avatar-glow" />
             </div>
-            {/* 新消息提示 */}
             {messages.length <= 1 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse" />
             )}
           </>
         )}
       </button>
-      
-      {/* 聊天窗口 */}
+     
       {isOpen && (
         <div className="chatbot-window">
-          {/* 头部 */}
           <div className="chatbot-header">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🌿</span>
+            <div className="flex items-center gap-3">
+              <div className="chatbot-header-avatar">
+                <Image
+                  src="/images/avatar-green.jpg"
+                  alt="绿"
+                  width={32}
+                  height={32}
+                  className="chatbot-header-avatar-img"
+                />
+              </div>
               <div>
                 <h3 className="font-bold text-sm">绿·AI资讯助手</h3>
                 <p className="text-xs opacity-80">新叶AI</p>
@@ -128,7 +139,6 @@ export function GreenChatbot() {
             </button>
           </div>
           
-          {/* 消息列表 */}
           <div className="chatbot-messages">
             {messages.map((msg) => (
               <div
@@ -139,7 +149,6 @@ export function GreenChatbot() {
               </div>
             ))}
             
-            {/* 正在输入指示器 */}
             {isTyping && (
               <div className="chat-message bot">
                 <div className="flex gap-1">
@@ -153,7 +162,6 @@ export function GreenChatbot() {
             <div ref={messagesEndRef} />
           </div>
           
-          {/* 快捷问题 */}
           <div className="quick-questions">
             {quickQuestions.map((q) => (
               <button
@@ -167,7 +175,6 @@ export function GreenChatbot() {
             ))}
           </div>
           
-          {/* 输入框 */}
           <div className="chatbot-input-area">
             <input
               type="text"
