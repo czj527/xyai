@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./video.css";
 
 export const metadata: Metadata = {
   title: "新叶早报 - 新叶AI",
@@ -11,10 +12,8 @@ export default function VideoLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
-      <body className="video-page-body">
-        {children}
-      </body>
-    </html>
+    <div className="video-page">
+      {children}
+    </div>
   );
 }

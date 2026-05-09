@@ -1,0 +1,12 @@
+/* 视频页面样式 - 隐藏导航栏和粒子效果 */
+.video-page .navbar-glass,
+.video-page header,
+.video-page nav,
+.video-page .spring-particle {
+  display: none !important;
+}
+
+.video-page {
+  min-height: 100vh;
+  background: #000;
+}

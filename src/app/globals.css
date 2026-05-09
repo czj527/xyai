@@ -1774,10 +1774,3 @@ html {
   padding: 0;
   min-height: 100vh;
 }
-
-.video-layout .spring-particle,
-.video-layout .navbar-glass,
-.video-layout header,
-.video-layout nav {
-  display: none !important;
-}

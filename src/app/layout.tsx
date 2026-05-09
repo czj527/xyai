@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className="min-h-screen flex flex-col bg-background text-foreground video-layout">
+      <body className="min-h-screen flex flex-col bg-background text-foreground">
         {/* 春季粒子飘落效果 */}
         <SpringParticles />
         
