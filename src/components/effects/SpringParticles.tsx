@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-// 春季emoji
-const SPRING_EMOJIS = ['🌸', '🌿', '🌱', '🦋', '🌷', '💮'];
+// 春季emoji - 增加更多选择
+const SPRING_EMOJIS = ['🌸', '🌿', '🌱', '🦋', '🌷', '💮', '🌻', '🍃'];
 
-// 粒子数量（性能优先，少量即可）
-const PARTICLE_COUNT = 8;
+// 粒子数量（性能优先）
+const PARTICLE_COUNT = 10;
 
 // 确定性伪随机（基于索引）
 function seededRandom(seed: number): number {
@@ -37,7 +37,7 @@ function generateParticles(): Particle[] {
       id: i,
       left: `${r1 * 95}%`,
       fontSize: 16 + r2 * 12,
-      opacity: 0.4 + r3 * 0.4,
+      opacity: 0.3 + r3 * 0.3, // 浅色模式透明度更低
       duration: `${12 + r4 * 10}s`,
       delay: `${-r1 * 18}s`,
       emoji: SPRING_EMOJIS[Math.floor(r2 * SPRING_EMOJIS.length)],
@@ -48,7 +48,7 @@ function generateParticles(): Particle[] {
 }
 
 interface SpringParticlesProps {
-  /** 是否启用（深色模式且用户未禁用） */
+  /** 是否启用 */
   enabled?: boolean;
 }
 
@@ -58,17 +58,35 @@ export function SpringParticles({ enabled = true }: SpringParticlesProps) {
   
   useEffect(() => {
     setMounted(true);
-    // 检测深色模式
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDark(mediaQuery.matches);
     
-    // 监听主题变化
-    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    // 检测深色模式 - 检查多个来源确保准确
+    const checkDarkMode = () => {
+      const isDarkClass = document.documentElement.classList.contains('dark');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return isDarkClass || prefersDark;
+    };
+    
+    setIsDark(checkDarkMode());
+    
+    // 监听 media query 变化
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => {
+      // 只有当用户没有手动设置主题时才跟随系统
+      const savedTheme = localStorage.getItem('xyai-theme');
+      if (!savedTheme) {
+        setIsDark(e.matches);
+      }
+    };
     mediaQuery.addEventListener('change', handler);
     
-    // 也监听 html class 的 dark 变化
+    // 监听 html class 的 dark 变化
     const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'));
+      const savedTheme = localStorage.getItem('xyai-theme');
+      if (!savedTheme) {
+        setIsDark(checkDarkMode());
+      } else {
+        setIsDark(savedTheme === 'dark');
+      }
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     
@@ -81,10 +99,13 @@ export function SpringParticles({ enabled = true }: SpringParticlesProps) {
   // 生成粒子（确定性，只在首次生成）
   const particles = useMemo(() => generateParticles(), []);
   
-  // SSR 或 未启用 或 浅色模式时不渲染
-  if (!mounted || !enabled || !isDark) {
+  // SSR 或 未启用 时不渲染
+  if (!mounted || !enabled) {
     return null;
   }
+  
+  // 根据主题调整透明度
+  const baseOpacity = isDark ? 0.7 : 0.4;
   
   return (
     <div
@@ -98,7 +119,7 @@ export function SpringParticles({ enabled = true }: SpringParticlesProps) {
           style={{
             left: p.left,
             fontSize: `${p.fontSize}px`,
-            '--sp-opacity': p.opacity,
+            '--sp-opacity': Math.min(p.opacity * baseOpacity, 0.8),
             '--sp-duration': p.duration,
             '--sp-delay': p.delay,
           } as React.CSSProperties}
