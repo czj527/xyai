@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { 
   Info, 
   Leaf, 
@@ -10,7 +11,8 @@ import {
   Sparkles,
   Zap,
   Users,
-  Code
+  Code,
+  Rocket
 } from 'lucide-react';
 
 export default function AboutPage() {
@@ -29,16 +31,16 @@ export default function AboutPage() {
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             新叶AI是一个AI资讯聚合网站，致力于为AI从业者和爱好者提供
-            最新、最有价值的行业资讯。每天早8点更新，帮助你紧跟AI发展前沿。
+            最新、最有价值的行业资讯。每天自动更新，帮助你紧跟AI发展前沿。
           </p>
         </div>
         
         {/* 特色标签 */}
         <div className="flex flex-wrap justify-center gap-3 mt-6">
           {[
-            { icon: Zap, text: '每日8:00自动更新' },
-            { icon: Sparkles, text: 'SSS-S评级筛选' },
-            { icon: Users, text: '服务10万+用户' },
+            { icon: Rocket, text: '全新上线' },
+            { icon: Sparkles, text: '持续进化中' },
+            { icon: Zap, text: '每日更新' },
           ].map((item, i) => (
             <span 
               key={i}
@@ -54,15 +56,30 @@ export default function AboutPage() {
       {/* 绿的角色介绍 */}
       <section className="glass-card-enhanced p-6 sm:p-8 mb-8">
         <div className="flex flex-col sm:flex-row items-center gap-6">
-          {/* 头像 */}
+          {/* 头像 - 使用真实头像图片 */}
           <div 
             className="flex-shrink-0 cursor-pointer"
             onClick={() => setShowAvatarGlow(!showAvatarGlow)}
             title="点击切换光晕效果"
           >
             <div className={`relative ${showAvatarGlow ? 'avatar-glow' : ''}`}>
-              <div className="avatar-glow-placeholder">
-                🌿
+              <div className="w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 flex items-center justify-center">
+                <Image 
+                  src="/images/avatar-green.jpg" 
+                  alt="绿的头像"
+                  width={128}
+                  height={128}
+                  className="object-cover"
+                  onError={() => {
+                    // 如果图片加载失败，使用emoji
+                    const img = document.querySelector('img[alt="绿的头像"]');
+                    if (img) {
+                      (img as HTMLImageElement).style.display = 'none';
+                      const parent = img.parentElement;
+                      if (parent) parent.innerHTML = '<span class="text-6xl">🌿</span>';
+                    }
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -78,7 +95,7 @@ export default function AboutPage() {
               </span>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              新叶AI的AI资讯播音员 · 每天凌晨开始准备素材
+              新叶AI的AI资讯播音员 · 每天准备最新素材
             </p>
             
             <div className="grid sm:grid-cols-2 gap-4 text-sm">
@@ -198,7 +215,7 @@ export default function AboutPage() {
           打造
         </p>
         <p className="text-xs text-muted-foreground/70 mt-2">
-          © 2025 新叶AI · 专注于AI资讯聚合
+          © 2026 新叶AI · 专注于AI资讯聚合
         </p>
       </section>
     </div>

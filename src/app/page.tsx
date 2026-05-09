@@ -1,30 +1,43 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Newspaper, RefreshCw, Sparkles, Leaf, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Newspaper, RefreshCw, Sparkles, Leaf, ChevronLeft, ChevronRight, Calendar, ArrowUpDown } from 'lucide-react';
 import { NewsCard, NewsCardSkeleton, NewsEmpty } from '@/components/ui/NewsCard';
 import { GreenChatbot } from '@/components/ui/GreenChatbot';
-import { mockNews } from '@/lib/mockData';
 import type { NewsItem } from '@/lib/supabase';
 
 const ITEMS_PER_PAGE = 6;
+
+type TimeFilter = 'daily' | 'weekly' | 'monthly';
+type SortBy = 'priority' | 'time';
+
+const TIME_FILTER_LABELS: Record<TimeFilter, string> = {
+  daily: '今日',
+  weekly: '上周',
+  monthly: '上月',
+};
 
 export default function HomePage() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('daily');
+  const [sortBy, setSortBy] = useState<SortBy>('priority');
   
   useEffect(() => {
     loadNews();
-  }, []);
+  }, [timeFilter, sortBy]);
   
   async function loadNews() {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setNews(mockNews);
-      setLastUpdate(new Date().toLocaleString('zh-CN'));
+      const response = await fetch(`/api/news?type=${timeFilter}&sort=${sortBy}`);
+      const data = await response.json();
+      if (data.success && data.data) {
+        setNews(data.data);
+        setLastUpdate(data.updated);
+      }
     } catch (error) {
       console.error('加载新闻失败:', error);
     } finally {
@@ -79,7 +92,7 @@ export default function HomePage() {
           <div className="hero-right">
             <div className="update-info">
               <span className="update-time">
-                {lastUpdate || '加载中...'}
+                {lastUpdate ? new Date(lastUpdate).toLocaleString('zh-CN') : '加载中...'}
               </span>
               <button
                 onClick={handleRefresh}
@@ -100,7 +113,7 @@ export default function HomePage() {
             </div>
             <div>
               <h2 className="text-lg font-bold text-foreground">
-                今日资讯
+                AI资讯
               </h2>
               <p className="text-xs text-muted-foreground">
                 聚焦AI领域最新动态
@@ -108,6 +121,73 @@ export default function HomePage() {
             </div>
           </div>
         </header>
+        
+        {/* 时间筛选和排序 */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          {/* 时间筛选 Tab */}
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+            {(Object.keys(TIME_FILTER_LABELS) as TimeFilter[]).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => {
+                  setTimeFilter(filter);
+                  setCurrentPage(1);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  timeFilter === filter
+                    ? 'bg-background shadow text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                {TIME_FILTER_LABELS[filter]}
+              </button>
+            ))}
+          </div>
+          
+          {/* 排序切换 */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">排序：</span>
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              <button
+                onClick={() => {
+                  setSortBy('priority');
+                  setCurrentPage(1);
+                }}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all ${
+                  sortBy === 'priority'
+                    ? 'bg-background shadow text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                按评级
+              </button>
+              <button
+                onClick={() => {
+                  setSortBy('time');
+                  setCurrentPage(1);
+                }}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all ${
+                  sortBy === 'time'
+                    ? 'bg-background shadow text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <ArrowUpDown className="w-3 h-3" />
+                按时间
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* 当前筛选状态提示 */}
+        {!loading && (
+          <div className="mb-4 text-xs text-muted-foreground">
+            共 {news.length} 条资讯 · {TIME_FILTER_LABELS[timeFilter]}资讯 · 
+            {sortBy === 'priority' ? '按SSS→SS→S→A→B评级排序' : '按最新时间排序'}
+          </div>
+        )}
         
         {loading ? (
           <div className="news-grid">
@@ -163,13 +243,14 @@ export default function HomePage() {
             )}
           </>
         ) : (
-          <NewsEmpty />
+          <NewsEmpty message={`暂无${TIME_FILTER_LABELS[timeFilter]}资讯`} />
         )}
         
         {!loading && news.length > 0 && (
           <div className="mt-8 pb-8 text-center">
             <p className="text-xs text-muted-foreground">
-              每8小时自动更新 · 数据来源：量子位、机器之心、HackerNews等
+              数据来源：量子位、机器之心、HackerNews等 · 
+              {sortBy === 'priority' ? '默认按SSS→B评级排序展示' : '按最新时间排序展示'}
             </p>
           </div>
         )}

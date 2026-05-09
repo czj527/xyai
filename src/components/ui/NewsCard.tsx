@@ -132,7 +132,11 @@ export function NewsCardSkeleton() {
   );
 }
 
-export function NewsEmpty() {
+interface NewsEmptyProps {
+  message?: string;
+}
+
+export function NewsEmpty({ message = '暂无资讯' }: NewsEmptyProps) {
   return (
     <div className="glass-card p-10 text-center rounded-xl">
       <div className="flex flex-col items-center gap-3">
@@ -142,7 +146,7 @@ export function NewsEmpty() {
         <div>
           <h3 className="text-base font-semibold text-foreground">暂无资讯</h3>
           <p className="text-xs text-muted-foreground mt-1.5">
-            稍后再来看看吧
+            {message}
           </p>
         </div>
       </div>
