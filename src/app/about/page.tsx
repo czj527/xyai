@@ -23,8 +23,8 @@ export default function AboutPage() {
       {/* 项目介绍 */}
       <section className="mb-12">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 mb-6 shadow-lg shadow-green-500/30">
-            <Leaf className="w-10 h-10 text-white" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full overflow-hidden mb-6 shadow-lg shadow-green-500/30 border-2 border-green-400/30">
+            <Image src="/images/avatar-green.jpg" alt="绿" width={80} height={80} className="w-full h-full object-cover" />
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
             关于新叶AI
