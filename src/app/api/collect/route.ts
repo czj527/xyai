@@ -1,5 +1,5 @@
 // 资讯采集API路由
-// 采集RSS → AI过滤评分 → MiMo摘要 → 写入Supabase
+// 采集RSS + 联网检索 → AI过滤评分 → MiMo摘要 → 写入Supabase
 
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -33,6 +33,15 @@ const RSS_SOURCES = [
   { name: 'MIT Tech Review AI', url: 'https://www.technologyreview.com/feed/', priority: 4, lang: 'en' },
 ];
 
+// 联网检索源配置
+const WEB_SEARCH_QUERIES = [
+  { query: 'AI latest news today 2024', source: 'Web Search', priority: 3 },
+  { query: '大模型最新发布 2024', source: 'Web Search', priority: 4 },
+  { query: 'OpenAI Google Anthropic latest', source: 'Web Search', priority: 4 },
+  { query: 'AI startup funding news', source: 'Web Search', priority: 3 },
+  { query: 'AI工具发布 最新', source: 'Web Search', priority: 3 },
+];
+
 // 关键词过滤
 const AI_KEYWORDS = [
   'AI', '人工智能', 'LLM', 'GPT', 'Claude', 'Gemini', '大模型',
@@ -50,9 +59,140 @@ interface NewsItem {
   priority: 'SSS' | 'SS' | 'S' | 'A' | 'B';
   category: string;
   published_at: string;
-  ai_summary?: string;
-  core_facts?: string[];
-  key_data?: string[];
+  image_url?: string;
+}
+
+// AI资讯分类体系（简化版）
+const AI_CATEGORIES = {
+  '模型发布': { emoji: '🤖', keywords: ['模型', 'model', 'gpt', 'claude', 'gemini', 'llama', 'qwen', '通义', '文心', '发布', 'release', 'launch', '升级', 'update', '版本', 'version', '新模型', '大模型', 'llm', 'foundation model'] },
+  '工具发布': { emoji: '🔧', keywords: ['工具', 'tool', '产品', 'product', 'app', '应用', '平台', 'platform', '插件', 'plugin', '扩展', 'extension', 'sdk', 'api', '框架', 'framework', '开源', 'open source', 'github', 'agent', '智能体'] },
+  '政策融资': { emoji: '💰', keywords: ['政策', '法规', '监管', 'regulation', 'policy', '融资', 'funding', '投资', 'investment', '收购', 'acquisition', '上市', 'ipo', '估值', 'valuation', '亿美元', 'million', 'billion', '轮', 'round', '风投', 'vc', '政府', 'government'] },
+  '项目相关': { emoji: '📦', keywords: [] }, // 默认分类
+};
+
+// 判断分类（改进版）
+function categorize(title: string, description: string): string {
+  const text = (title + ' ' + description).toLowerCase();
+  
+  // 按优先级匹配分类
+  for (const [category, config] of Object.entries(AI_CATEGORIES)) {
+    if (category === '项目相关') continue; // 跳过默认分类
+    for (const keyword of config.keywords) {
+      if (text.includes(keyword)) {
+        return category;
+      }
+    }
+  }
+  
+  return '项目相关';
+}
+
+// 评分函数（改进版）
+function scoreNews(title: string, description: string): number {
+  let score = 0;
+  const text = (title + ' ' + description).toLowerCase();
+  
+  // 关键词匹配
+  AI_KEYWORDS.forEach(keyword => {
+    if (text.includes(keyword.toLowerCase())) {
+      score += 10;
+    }
+  });
+  
+  // 高权重关键词
+  const highWeightKeywords = ['gpt-5', 'gpt5', 'claude 4', 'gemini 2', 'llama 4', '发布', 'release', 'launch', '融资', 'funding', '亿美元', 'billion'];
+  highWeightKeywords.forEach(keyword => {
+    if (text.includes(keyword.toLowerCase())) {
+      score += 20;
+    }
+  });
+  
+  // 标题长度适中
+  if (title.length > 10 && title.length < 100) {
+    score += 5;
+  }
+  
+  return score;
+}
+
+// 获取优先级
+function getPriority(score: number): 'SSS' | 'SS' | 'S' | 'A' | 'B' {
+  if (score >= 80) return 'SSS';
+  if (score >= 60) return 'SS';
+  if (score >= 40) return 'S';
+  if (score >= 20) return 'A';
+  return 'B';
+}
+
+// 联网检索AI资讯
+async function searchWebNews(): Promise<NewsItem[]> {
+  const results: NewsItem[] = [];
+  
+  for (const search of WEB_SEARCH_QUERIES) {
+    try {
+      // 使用 DuckDuckGo Instant Answer API
+      const response = await fetch(
+        `https://api.duckduckgo.com/?q=${encodeURIComponent(search.query)}&format=json&no_html=1&skip_disambig=1`,
+        { 
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; XyAI-Bot/1.0)' },
+          signal: AbortSignal.timeout(10000)
+        }
+      );
+      
+      if (!response.ok) continue;
+      
+      const data = await response.json();
+      
+      // 解析结果
+      if (data.AbstractText) {
+        results.push({
+          id: `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          title: data.Heading || search.query,
+          summary: data.AbstractText.slice(0, 200),
+          source: data.AbstractSource || search.source,
+          source_url: data.AbstractURL || '',
+          priority: getPriority(scoreNews(data.Heading || '', data.AbstractText)),
+          category: categorize(data.Heading || '', data.AbstractText),
+          published_at: new Date().toISOString(),
+          image_url: data.Image || undefined
+        });
+      }
+      
+      // 解析 RelatedTopics
+      if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
+        for (const topic of data.RelatedTopics.slice(0, 3)) {
+          if (topic.Text && topic.FirstURL) {
+            results.push({
+              id: `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              title: topic.Text.slice(0, 100),
+              summary: topic.Text,
+              source: search.source,
+              source_url: topic.FirstURL,
+              priority: getPriority(scoreNews(topic.Text, '')),
+              category: categorize(topic.Text, ''),
+              published_at: new Date().toISOString(),
+              image_url: topic.Icon?.URL || undefined
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Web search failed for "${search.query}":`, error);
+    }
+  }
+  
+  return results;
+}
+
+// 获取RSS新闻
+async function fetchRSS(url: string): Promise<any[]> {
+  try {
+    const feed = await rssParser.parseURL(url);
+    return feed.items || [];
+  } catch (error) {
+    console.error(`RSS fetch error for ${url}:`, error);
+    return [];
+  }
 }
 
 // MiMo API 调用
@@ -81,105 +221,14 @@ async function callMiMoAPI(prompt: string): Promise<string> {
   });
   
   if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw new Error(`MiMo API error: ${response.status} ${errText}`);
+    throw new Error(`MiMo API error: ${response.status}`);
   }
   
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
 }
 
-// RSS抓取（使用rss-parser库）
-async function fetchRSS(url: string): Promise<{ title: string; link: string; description: string; pubDate: string }[]> {
-  try {
-    const feed = await rssParser.parseURL(url);
-    
-    return (feed.items || [])
-      .filter(item => item.title && item.link)
-      .map(item => ({
-        title: cleanHtml(item.title || ''),
-        link: item.link || '',
-        description: cleanHtml(item.contentSnippet || item.content || item.summary || ''),
-        pubDate: item.pubDate || item.isoDate || '',
-      }));
-  } catch (error) {
-    console.error(`Error fetching RSS: ${url}`, error);
-    return [];
-  }
-}
-
-// 清理HTML标签
-function cleanHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// 关键词匹配评分
-function scoreNews(title: string, description: string): number {
-  let score = 0;
-  const text = (title + ' ' + description).toLowerCase();
-  
-  // 关键词匹配
-  for (const keyword of AI_KEYWORDS) {
-    if (text.includes(keyword.toLowerCase())) {
-      score += 5;
-    }
-  }
-  
-  // 高权重关键词
-  const highWeightKeywords = ['gpt-5', 'claude 4', 'gemini 3', '发布', '开源', 'release', 'announced', 'breakthrough'];
-  for (const keyword of highWeightKeywords) {
-    if (text.includes(keyword.toLowerCase())) {
-      score += 15;
-    }
-  }
-  
-  return Math.min(score, 100);
-}
-
-// 判断优先级
-function getPriority(score: number): NewsItem['priority'] {
-  if (score >= 80) return 'SSS';
-  if (score >= 60) return 'SS';
-  if (score >= 40) return 'S';
-  if (score >= 20) return 'A';
-  return 'B';
-}
-
-// AI资讯分类体系（简化版）
-const AI_CATEGORIES = {
-  '模型发布': { emoji: '🤖', keywords: ['模型', 'model', 'gpt', 'claude', 'gemini', 'llama', 'qwen', '通义', '文心', '发布', 'release', 'launch', '升级', 'update', '版本', 'version', '新模型', '大模型', 'llm', 'foundation model'] },
-  '工具发布': { emoji: '🔧', keywords: ['工具', 'tool', '产品', 'product', 'app', '应用', '平台', 'platform', '插件', 'plugin', '扩展', 'extension', 'sdk', 'api', '框架', 'framework', '开源', 'open source', 'github', 'agent', '智能体'] },
-  '政策融资': { emoji: '💰', keywords: ['政策', '法规', '监管', 'regulation', 'policy', '融资', 'funding', '投资', 'investment', '收购', 'acquisition', '上市', 'ipo', '估值', 'valuation', '亿美元', 'million', 'billion', '轮', 'round', '风投', 'vc', '政府', 'government'] },
-  '项目相关': { emoji: '📦', keywords: [] }, // 默认分类
-};
-
-// 判断分类（改进版）
-function categorize(title: string, description: string): string {
-  const text = (title + ' ' + description).toLowerCase();
-  
-  // 按优先级匹配分类
-  for (const [category, config] of Object.entries(AI_CATEGORIES)) {
-    if (category === '行业资讯') continue; // 跳过默认分类
-    for (const keyword of config.keywords) {
-      if (text.includes(keyword)) {
-        return category;
-      }
-    }
-  }
-  
-  return '项目相关';
-}
-
-// 批量生成摘要（一次性处理多条，节省API调用）
+// 批量生成摘要
 async function generateBatchSummary(items: { title: string; description: string }[]): Promise<string[]> {
   if (items.length === 0) return [];
   
@@ -222,7 +271,7 @@ ${newsList}
   }
 }
 
-// 单条摘要生成（降级用）
+// 单条摘要生成
 async function generateSummary(title: string, description: string): Promise<string> {
   const prompt = `请为以下AI新闻生成50字以内的中文摘要：
 
@@ -257,18 +306,103 @@ async function getExistingTitles(): Promise<Set<string>> {
     if (error || !data) return new Set();
     
     const titles = new Set<string>();
-    for (const report of data) {
+    data.forEach(report => {
       if (report.news && Array.isArray(report.news)) {
-        for (const item of report.news) {
+        report.news.forEach((item: any) => {
           if (item.title) {
             titles.add(item.title.toLowerCase().trim());
           }
-        }
+        });
+      }
+    });
+    
+    return titles;
+  } catch (error) {
+    console.error('Get existing titles error:', error);
+    return new Set();
+  }
+}
+
+// AI自动审核新闻
+async function aiReviewNews(news: NewsItem[]): Promise<(NewsItem & { ai_approved: boolean })[]> {
+  if (news.length === 0) return [];
+  
+  const prompt = `请审核以下AI新闻，判断是否适合发布到AI资讯网站。
+
+审核标准：
+1. 必须与AI/人工智能/大模型/机器学习相关
+2. 内容真实可信，非虚假信息
+3. 有一定新闻价值，非纯广告或水文
+4. 标题清晰，非乱码或截断
+
+新闻列表：
+${news.map((item, i) => `${i + 1}. [${item.priority}] ${item.title}\n   来源: ${item.source}`).join('\n\n')}
+
+请返回JSON数组，每个元素包含：
+- approved: boolean (是否通过审核)
+- reason: string (审核理由，简短)
+
+格式：[{"approved": true, "reason": "AI相关内容"}, ...]`;
+
+  try {
+    const result = await callMiMoAPI(prompt);
+    const jsonMatch = result.match(/\[[\s\S]*\]/);
+    
+    if (jsonMatch) {
+      const reviews = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(reviews) && reviews.length === news.length) {
+        return news.map((item, i) => ({
+          ...item,
+          ai_approved: reviews[i]?.approved ?? true,
+        }));
       }
     }
-    return titles;
-  } catch {
-    return new Set();
+    
+    // 解析失败，默认全部通过
+    return news.map(item => ({ ...item, ai_approved: true }));
+  } catch (error) {
+    console.error('AI review error, auto-approving:', error);
+    return news.map(item => ({ ...item, ai_approved: true }));
+  }
+}
+
+// 将已审核通过的新闻写入日报表
+async function writeApprovedToDailyReports(news: NewsItem[]): Promise<void> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const hour = new Date().getHours();
+    const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+    
+    // 查找今天的日报
+    const { data: existingReport } = await supabaseAdmin
+      .from('xyai_daily_reports')
+      .select('id, news')
+      .eq('date', today)
+      .eq('period', period)
+      .single();
+    
+    if (existingReport) {
+      // 追加到已有日报
+      const updatedNews = [...(existingReport.news || []), ...news];
+      await supabaseAdmin
+        .from('xyai_daily_reports')
+        .update({ news: updatedNews })
+        .eq('id', existingReport.id);
+    } else {
+      // 创建新日报
+      await supabaseAdmin
+        .from('xyai_daily_reports')
+        .insert({
+          date: today,
+          period,
+          news: news,
+          headline: news[0]?.title || 'AI资讯',
+        });
+    }
+    
+    console.log(`[审核Agent] 已将 ${news.length} 条新闻写入日报`);
+  } catch (error) {
+    console.error('Write to daily reports error:', error);
   }
 }
 
@@ -327,115 +461,6 @@ async function writeToPendingNews(news: NewsItem[]): Promise<{ success: boolean;
   }
 }
 
-// AI 自动审核新闻 + 智能分类
-async function aiReviewNews(news: NewsItem[]): Promise<(NewsItem & { ai_approved: boolean })[]> {
-  if (news.length === 0) return [];
-  
-  const categories = Object.keys(AI_CATEGORIES);
-  
-  const prompt = `请审核以下AI新闻，判断是否适合发布，并进行精确分类。
-
-审核标准：
-1. 必须与AI/人工智能/大模型/机器学习相关
-2. 内容真实可信，非虚假信息
-3. 有一定新闻价值，非纯广告或水文
-4. 标题清晰，非乱码或截断
-
-分类选项（请选择最匹配的一个）：
-${categories.map(c => `- ${c}：${getCategoryDesc(c)}`).join('\n')}
-
-新闻列表：
-${news.map((item, i) => `${i + 1}. [${item.priority}] ${item.title}\n   来源: ${item.source}`).join('\n\n')}
-
-请返回JSON数组，每个元素包含：
-- approved: boolean (是否通过审核)
-- reason: string (审核理由，简短)
-- category: string (从上面的分类选项中选择)
-
-格式：[{"approved": true, "reason": "AI相关内容", "category": "模型发布"}, ...]`;
-
-  try {
-    const result = await callMiMoAPI(prompt);
-    const jsonMatch = result.match(/\[[\s\S]*\]/);
-    
-    if (jsonMatch) {
-      const reviews = JSON.parse(jsonMatch[0]);
-      if (Array.isArray(reviews) && reviews.length === news.length) {
-        return news.map((item, i) => ({
-          ...item,
-          ai_approved: reviews[i]?.approved ?? true,
-          // 使用AI分类，如果无效则降级到规则分类
-          category: categories.includes(reviews[i]?.category) 
-            ? reviews[i].category 
-            : item.category,
-        }));
-      }
-    }
-    
-    // 解析失败，默认全部通过
-    return news.map(item => ({ ...item, ai_approved: true }));
-  } catch (error) {
-    console.error('AI review error, auto-approving:', error);
-    return news.map(item => ({ ...item, ai_approved: true }));
-  }
-}
-
-// 获取分类描述（用于AI理解）
-function getCategoryDesc(category: string): string {
-  const descs: Record<string, string> = {
-    '模型发布': '新AI模型发布、版本更新、能力升级',
-    '政策法规': 'AI相关政策、法律法规、政府监管',
-    '定价计划': 'Token定价、API计费、订阅套餐变化',
-    '工具产品': 'AI工具、应用、平台、SDK、Agent',
-    '基准测评': '模型评测、排行榜、基准测试、性能对比',
-    '研究论文': '学术论文、技术突破、算法创新',
-    '融资动态': '融资、收购、上市、估值变动',
-    '安全伦理': 'AI安全、伦理问题、对齐研究、风险',
-    '行业资讯': '其他AI行业动态',
-  };
-  return descs[category] || '';
-}
-
-// 将已审核通过的新闻写入日报表
-async function writeApprovedToDailyReports(news: NewsItem[]): Promise<void> {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const hour = new Date().getHours();
-    const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
-    
-    // 查找今天的日报
-    const { data: existingReport } = await supabaseAdmin
-      .from('xyai_daily_reports')
-      .select('id, news')
-      .eq('date', today)
-      .eq('period', period)
-      .single();
-    
-    if (existingReport) {
-      // 追加到已有日报
-      const updatedNews = [...(existingReport.news || []), ...news];
-      await supabaseAdmin
-        .from('xyai_daily_reports')
-        .update({ news: updatedNews })
-        .eq('id', existingReport.id);
-    } else {
-      // 创建新日报
-      await supabaseAdmin
-        .from('xyai_daily_reports')
-        .insert({
-          date: today,
-          period,
-          news: news,
-          headline: news[0]?.title || 'AI资讯',
-        });
-    }
-    
-    console.log(`[审核Agent] 已将 ${news.length} 条新闻写入日报`);
-  } catch (error) {
-    console.error('Write to daily reports error:', error);
-  }
-}
-
 // POST: 手动触发采集
 export async function POST(request: Request) {
   try {
@@ -449,41 +474,54 @@ export async function POST(request: Request) {
     console.log(`[采集Agent] 已有 ${existingTitles.size} 条历史标题`);
     
     const results: NewsItem[] = [];
+    
+    // 1. 采集RSS源
     const sourcesToFetch = source 
       ? RSS_SOURCES.filter(s => s.name === source)
       : RSS_SOURCES;
     
-    // 采集所有RSS源
     for (const sourceConfig of sourcesToFetch) {
       const items = await fetchRSS(sourceConfig.url);
       console.log(`[采集Agent] ${sourceConfig.name}: 获取 ${items.length} 条`);
       
       for (const item of items) {
-        const score = scoreNews(item.title, item.description);
+        const score = scoreNews(item.title || '', item.contentSnippet || '');
         
         // 只保留AI相关且评分较高的，且去重
-        if (score >= 15 && !existingTitles.has(item.title.toLowerCase().trim())) {
+        if (score >= 15 && !existingTitles.has((item.title || '').toLowerCase().trim())) {
           results.push({
             id: `news-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            title: item.title,
+            title: item.title || '',
             summary: '', // 稍后批量生成
             source: sourceConfig.name,
-            source_url: item.link,
+            source_url: item.link || '',
             priority: getPriority(score),
-            category: categorize(item.title, item.description),
+            category: categorize(item.title || '', item.contentSnippet || ''),
             published_at: item.pubDate || new Date().toISOString(),
+            image_url: item['media:content']?.$ || item['media:thumbnail']?.$ || undefined
           });
         }
       }
     }
     
-    // 按优先级排序，取前15条
+    // 2. 联网检索AI资讯
+    console.log('[采集Agent] 开始联网检索...');
+    const webNews = await searchWebNews();
+    console.log(`[采集Agent] 联网检索: 获取 ${webNews.length} 条`);
+    
+    // 去重后添加
+    for (const item of webNews) {
+      if (!existingTitles.has(item.title.toLowerCase().trim())) {
+        results.push(item);
+      }
+    }
+    
+    // 按优先级排序，不限制数量
     const sortedResults = results
       .sort((a, b) => {
         const priorityOrder = { SSS: 0, SS: 1, S: 2, A: 3, B: 4 };
         return priorityOrder[a.priority] - priorityOrder[b.priority];
-      })
-      .slice(0, 15);
+      });
     
     console.log(`[采集Agent] 过滤后 ${sortedResults.length} 条待处理`);
     
@@ -541,6 +579,10 @@ export async function GET() {
       name: s.name,
       priority: s.priority,
       available: true,
+    })),
+    web_search: WEB_SEARCH_QUERIES.map(q => ({
+      query: q.query,
+      source: q.source,
     })),
     model: 'mimo-v2.5 (采集) / mimo-v2.5-pro (对话)',
     timestamp: new Date().toISOString(),
