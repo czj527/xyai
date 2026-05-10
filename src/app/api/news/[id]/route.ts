@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import type { NewsItem } from '@/lib/supabase';
 
+// 数据格式规范化：字符串→数组，空summary用ai_summary兜底
+function normalizeNewsItem(n: any): NewsItem {
+  const item = { ...n };
+  if (!item.summary || item.summary.trim() === '') {
+    item.summary = item.ai_summary || '';
+  }
+  if (typeof item.core_facts === 'string') {
+    const text = item.core_facts.trim();
+    item.core_facts = text && text !== '无' ? text.split(/[。；]/).map((s: string) => s.trim()).filter((s: string) => s.length > 0) : [];
+  } else if (!Array.isArray(item.core_facts)) {
+    item.core_facts = [];
+  }
+  if (typeof item.key_data === 'string') {
+    const text = item.key_data.trim();
+    item.key_data = text && text !== '无' ? text.split(/[，,；]/).map((s: string) => s.trim()).filter((s: string) => s.length > 0) : [];
+  } else if (!Array.isArray(item.key_data)) {
+    item.key_data = [];
+  }
+  if (!Array.isArray(item.related_links)) {
+    item.related_links = [];
+  }
+  return item as NewsItem;
+}
+
+
+
 interface ExtendedNewsItem extends NewsItem {
   core_facts?: string[];
   key_data?: string[];
@@ -52,7 +78,7 @@ export async function GET(
       if (seen.has(n.id)) return false;
       seen.add(n.id);
       return true;
-    });
+    }).map(n => normalizeNewsItem(n));
 
     allNews.sort((a, b) => 
       (PRIORITY_ORDER[a.priority] || 5) - (PRIORITY_ORDER[b.priority] || 5)
@@ -65,19 +91,7 @@ export async function GET(
       prevNews = index > 0 ? allNews[index - 1] : null;
       nextNews = index < allNews.length - 1 ? allNews[index + 1] : null;
 
-      if (targetNews.core_facts || targetNews.key_data) {
-        // Already extended
-      } else {
-        targetNews.core_facts = [
-          '这是该新闻的核心事实第一点',
-          '这是该新闻的核心事实第二点',
-        ];
-        targetNews.key_data = [
-          '关键数据项1',
-          '关键数据项2',
-        ];
-        targetNews.related_links = [];
-      }
+
     }
 
     if (!targetNews) {

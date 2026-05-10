@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import type { NewsItem } from '@/lib/supabase';
 
+// 数据格式规范化：字符串→数组，空summary用ai_summary兜底
+function normalizeNewsItem(n: any): NewsItem {
+  const item = { ...n };
+  if (!item.summary || item.summary.trim() === '') {
+    item.summary = item.ai_summary || '';
+  }
+  if (typeof item.core_facts === 'string') {
+    const text = item.core_facts.trim();
+    item.core_facts = text && text !== '无' ? text.split(/[。；]/).map((s: string) => s.trim()).filter((s: string) => s.length > 0) : [];
+  } else if (!Array.isArray(item.core_facts)) {
+    item.core_facts = [];
+  }
+  if (typeof item.key_data === 'string') {
+    const text = item.key_data.trim();
+    item.key_data = text && text !== '无' ? text.split(/[，,；]/).map((s: string) => s.trim()).filter((s: string) => s.length > 0) : [];
+  } else if (!Array.isArray(item.key_data)) {
+    item.key_data = [];
+  }
+  if (!Array.isArray(item.related_links)) {
+    item.related_links = [];
+  }
+  return item as NewsItem;
+}
+
+
+
 // 优先级排序权重
 const PRIORITY_ORDER: Record<string, number> = {
   'SSS': 0, 'SS': 1, 'S': 2, 'A': 3, 'B': 4,
