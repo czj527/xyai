@@ -287,8 +287,11 @@ async function writeToPendingNews(news: NewsItem[]): Promise<{ success: boolean;
       return { success: true, count: 0 };
     }
     
+    // AI 自动审核
+    const reviewedNews = await aiReviewNews(newNews);
+    
     // 批量插入待审核表
-    const rows = newNews.map(item => ({
+    const rows = reviewedNews.map(item => ({
       title: item.title,
       summary: item.summary,
       source: item.source,
@@ -296,7 +299,8 @@ async function writeToPendingNews(news: NewsItem[]): Promise<{ success: boolean;
       priority: item.priority,
       category: item.category,
       published_at: item.published_at,
-      status: 'draft',
+      status: item.ai_approved ? 'published' : 'draft',
+      ai_enhanced: true,
     }));
     
     const { error } = await supabaseAdmin
@@ -308,10 +312,99 @@ async function writeToPendingNews(news: NewsItem[]): Promise<{ success: boolean;
       return { success: false, error: error.message };
     }
     
+    // 自动发布的新闻直接写入日报表
+    const approvedNews = reviewedNews.filter(n => n.ai_approved);
+    if (approvedNews.length > 0) {
+      await writeApprovedToDailyReports(approvedNews);
+    }
+    
     return { success: true, count: newNews.length };
   } catch (error) {
     console.error('Pending news write error:', error);
     return { success: false, error: String(error) };
+  }
+}
+
+// AI 自动审核新闻
+async function aiReviewNews(news: NewsItem[]): Promise<(NewsItem & { ai_approved: boolean })[]> {
+  if (news.length === 0) return [];
+  
+  const prompt = `请审核以下AI新闻，判断是否适合发布到AI资讯网站。
+
+审核标准：
+1. 必须与AI/人工智能/大模型/机器学习相关
+2. 内容真实可信，非虚假信息
+3. 有一定新闻价值，非纯广告或水文
+4. 标题清晰，非乱码或截断
+
+新闻列表：
+${news.map((item, i) => `${i + 1}. [${item.priority}] ${item.title}\n   来源: ${item.source}`).join('\n\n')}
+
+请返回JSON数组，每个元素包含：
+- approved: boolean (是否通过审核)
+- reason: string (审核理由，简短)
+
+格式：[{"approved": true, "reason": "AI相关内容"}, ...]`;
+
+  try {
+    const result = await callMiMoAPI(prompt);
+    const jsonMatch = result.match(/\[[\s\S]*\]/);
+    
+    if (jsonMatch) {
+      const reviews = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(reviews) && reviews.length === news.length) {
+        return news.map((item, i) => ({
+          ...item,
+          ai_approved: reviews[i]?.approved ?? true,
+        }));
+      }
+    }
+    
+    // 解析失败，默认全部通过
+    return news.map(item => ({ ...item, ai_approved: true }));
+  } catch (error) {
+    console.error('AI review error, auto-approving:', error);
+    return news.map(item => ({ ...item, ai_approved: true }));
+  }
+}
+
+// 将已审核通过的新闻写入日报表
+async function writeApprovedToDailyReports(news: NewsItem[]): Promise<void> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const hour = new Date().getHours();
+    const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+    
+    // 查找今天的日报
+    const { data: existingReport } = await supabaseAdmin
+      .from('xyai_daily_reports')
+      .select('id, news')
+      .eq('date', today)
+      .eq('period', period)
+      .single();
+    
+    if (existingReport) {
+      // 追加到已有日报
+      const updatedNews = [...(existingReport.news || []), ...news];
+      await supabaseAdmin
+        .from('xyai_daily_reports')
+        .update({ news: updatedNews })
+        .eq('id', existingReport.id);
+    } else {
+      // 创建新日报
+      await supabaseAdmin
+        .from('xyai_daily_reports')
+        .insert({
+          date: today,
+          period,
+          news: news,
+          headline: news[0]?.title || 'AI资讯',
+        });
+    }
+    
+    console.log(`[审核Agent] 已将 ${news.length} 条新闻写入日报`);
+  } catch (error) {
+    console.error('Write to daily reports error:', error);
   }
 }
 
@@ -388,7 +481,7 @@ export async function POST(request: Request) {
     }
     
     // 写入待审核表
-    let dbResult = { success: true, count: 0 };
+    let dbResult: { success: boolean; error?: string; count?: number } = { success: true, count: 0 };
     if (sortedResults.length > 0) {
       dbResult = await writeToPendingNews(sortedResults);
     }

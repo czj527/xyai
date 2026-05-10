@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/ui/Navbar";
 import { SpringParticles } from "@/components/effects/SpringParticles";
+import { GreenChatbot } from "@/components/ui/GreenChatbot";
 
 export const metadata: Metadata = {
   title: "新叶AI - AI资讯早报",
@@ -37,6 +38,9 @@ export default function RootLayout({
         <main className="flex-1 relative z-10 pb-20 md:pb-0">
           {children}
         </main>
+        
+        {/* AI 对话助手 */}
+        <GreenChatbot />
       </body>
     </html>
   );
