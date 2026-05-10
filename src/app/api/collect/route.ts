@@ -35,7 +35,7 @@ interface NewsItem {
 // MiMo API 调用
 async function callMiMoAPI(prompt: string): Promise<string> {
   const apiKey = process.env.MIMO_API_KEY;
-  const baseUrl = process.env.MIMO_BASE_URL || 'https://token-plan-cn.xiaomimimo.com/v1';
+  const baseUrl = process.env.MIMO_BASE_URL || 'https://api.xiaomimimo.com/v1';
   
   if (!apiKey) {
     throw new Error('MIMO_API_KEY not configured');

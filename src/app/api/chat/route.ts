@@ -3,8 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase';
 import type { NewsItem } from '@/lib/supabase';
 
 // MiMo API 配置
-const MIMO_API_URL = 'https://token-plan-cn.xiaomimimo.com/v1/chat/completions';
-const MIMO_MODEL = 'MiMo-V2.5-Pro';
+const MIMO_API_URL = 'https://api.xiaomimimo.com/v1/chat/completions';
+const MIMO_MODEL = 'mimo-v2-pro';
 
 // 从 Supabase 或 API 获取最新新闻
 async function getLatestNews(): Promise<NewsItem[]> {
