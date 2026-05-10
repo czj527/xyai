@@ -11,7 +11,8 @@ import {
   FileText,
   EyeOff,
   Menu,
-  Download
+  Download,
+  Home
 } from 'lucide-react';
 import type { NewsItem } from '@/lib/supabase';
 import './video.css';
@@ -102,12 +103,15 @@ function VideoPageContent() {
         setViewMode(prev => prev === 'summary' ? 'detail' : 'summary');
       } else if (e.key === 'h' || e.key === 'H') {
         setIsNavbarHidden(prev => !prev);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        router.push('/');
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goToNext, goToPrev]);
+  }, [goToNext, goToPrev, router]);
   
   const getPriorityStyle = (priority: string) => {
     return priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.B;
@@ -195,6 +199,13 @@ function VideoPageContent() {
           </div>
           
           <div className="controls-right">
+            <button
+              onClick={() => router.push('/')}
+              className="icon-btn"
+              title="返回首页"
+            >
+              <Home className="w-4 h-4" />
+            </button>
             <button
               onClick={() => setIsNavbarHidden(true)}
               className="icon-btn"
@@ -335,6 +346,7 @@ function VideoPageContent() {
           <span>← → 切换</span>
           <span>V 切换视图</span>
           <span>H 隐藏控制栏</span>
+          <span>Home 返回首页</span>
         </div>
       </div>
     </div>
