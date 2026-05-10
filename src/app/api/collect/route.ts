@@ -52,7 +52,7 @@ async function callMiMoAPI(prompt: string): Promise<string> {
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'mimo-v2-pro',
+      model: 'mimo-v2.5',
       messages: [
         { role: 'user', content: prompt },
       ],
@@ -454,7 +454,7 @@ export async function GET() {
       priority: s.priority,
       available: true,
     })),
-    model: 'mimo-v2-pro',
+    model: 'mimo-v2.5 (采集) / mimo-v2.5-pro (对话)',
     timestamp: new Date().toISOString(),
   });
 }

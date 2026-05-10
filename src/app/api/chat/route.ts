@@ -7,7 +7,7 @@ function getMimoApiUrl() {
   const baseUrl = process.env.MIMO_BASE_URL || 'https://token-plan-cn.xiaomimimo.com/v1';
   return `${baseUrl}/chat/completions`;
 }
-const MIMO_MODEL = 'mimo-v2-pro';
+const MIMO_MODEL = 'mimo-v2.5-pro';
 
 // 从 Supabase 或 API 获取最新新闻
 async function getLatestNews(): Promise<NewsItem[]> {
