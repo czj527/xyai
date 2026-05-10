@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
@@ -13,9 +13,28 @@ import {
   ExternalLink,
   TrendingUp,
   Flame,
-  ArrowRight
+  ArrowRight,
+  Filter
 } from 'lucide-react';
 import type { NewsItem } from '@/lib/supabase';
+
+// 分类配置
+const CATEGORY_CONFIG: Record<string, { emoji: string; color: string; bgColor: string }> = {
+  '模型发布': { emoji: '🤖', color: 'text-blue-600', bgColor: 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' },
+  '政策法规': { emoji: '📋', color: 'text-purple-600', bgColor: 'bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800' },
+  '定价计划': { emoji: '💰', color: 'text-amber-600', bgColor: 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800' },
+  '工具产品': { emoji: '🔧', color: 'text-emerald-600', bgColor: 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800' },
+  '基准测评': { emoji: '📊', color: 'text-cyan-600', bgColor: 'bg-cyan-50 dark:bg-cyan-900/30 border-cyan-200 dark:border-cyan-800' },
+  '研究论文': { emoji: '🔬', color: 'text-indigo-600', bgColor: 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800' },
+  '融资动态': { emoji: '💼', color: 'text-rose-600', bgColor: 'bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800' },
+  '安全伦理': { emoji: '🔒', color: 'text-orange-600', bgColor: 'bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800' },
+  '行业资讯': { emoji: '🌐', color: 'text-slate-600', bgColor: 'bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800' },
+};
+
+// 获取分类样式
+function getCategoryStyle(category: string) {
+  return CATEGORY_CONFIG[category] || CATEGORY_CONFIG['行业资讯'];
+}
 
 // 优先级配置
 const priorityConfig = {
@@ -87,6 +106,7 @@ function formatTimeDiff(dateStr: string): string {
 function FeaturedCard({ news, index }: { news: NewsItem; index: number }) {
   const priority = priorityConfig[news.priority] || priorityConfig.B;
   const PriorityIcon = priority.icon;
+  const categoryStyle = getCategoryStyle(news.category);
   
   return (
     <Link href={`/news/${news.id}`} className="block group">
@@ -94,12 +114,17 @@ function FeaturedCard({ news, index }: { news: NewsItem; index: number }) {
         {/* 背景装饰 */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/20 to-transparent rounded-bl-full" />
         
-        {/* 优先级标签 */}
+        {/* 优先级和分类标签 */}
         <div className="flex items-center justify-between mb-4">
-          <span className={`px-3 py-1 rounded-full text-xs font-bold ${priority.bgColor} ${priority.textColor} shadow-lg`}>
-            {PriorityIcon && <PriorityIcon className="w-3 h-3 inline mr-1" />}
-            {priority.label}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${priority.bgColor} ${priority.textColor} shadow-lg`}>
+              {PriorityIcon && <PriorityIcon className="w-3 h-3 inline mr-1" />}
+              {priority.label}
+            </span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${categoryStyle.bgColor} ${categoryStyle.color}`}>
+              {categoryStyle.emoji} {news.category}
+            </span>
+          </div>
           <span className="text-xs text-slate-400 flex items-center gap-1">
             <Clock className="w-3 h-3" />
             {formatTimeDiff(news.published_at)}
@@ -135,6 +160,7 @@ function FeaturedCard({ news, index }: { news: NewsItem; index: number }) {
 // 新闻列表项组件
 function NewsListItem({ news, index }: { news: NewsItem; index: number }) {
   const priority = priorityConfig[news.priority] || priorityConfig.B;
+  const categoryStyle = getCategoryStyle(news.category);
   
   return (
     <Link href={`/news/${news.id}`} className="block group">
@@ -150,7 +176,9 @@ function NewsListItem({ news, index }: { news: NewsItem; index: number }) {
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${priority.bgColor} ${priority.textColor}`}>
               {priority.label}
             </span>
-            <span className="text-xs text-muted-foreground">{news.category}</span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${categoryStyle.bgColor} ${categoryStyle.color}`}>
+              {categoryStyle.emoji} {news.category}
+            </span>
           </div>
           
           <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors mb-2 line-clamp-2">
@@ -184,6 +212,7 @@ export default function HomePage() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState({ date: '', weekday: '' });
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
   useEffect(() => {
     setLoading(true);
@@ -203,8 +232,28 @@ export default function HomePage() {
       });
   }, []);
   
-  const featuredNews = news.slice(0, 3);
-  const listNews = news.slice(3);
+  // 计算每个分类的数量
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    news.forEach(item => {
+      counts[item.category] = (counts[item.category] || 0) + 1;
+    });
+    return counts;
+  }, [news]);
+  
+  // 获取所有有数据的分类
+  const availableCategories = useMemo(() => {
+    return Object.keys(categoryCounts).sort((a, b) => categoryCounts[b] - categoryCounts[a]);
+  }, [categoryCounts]);
+  
+  // 过滤新闻
+  const filteredNews = useMemo(() => {
+    if (!selectedCategory) return news;
+    return news.filter(item => item.category === selectedCategory);
+  }, [news, selectedCategory]);
+  
+  const featuredNews = filteredNews.slice(0, 3);
+  const listNews = filteredNews.slice(3);
 
   return (
     <div className="relative min-h-screen">
@@ -240,6 +289,55 @@ export default function HomePage() {
           </div>
         </section>
         
+        {/* 分类筛选栏 */}
+        {!loading && availableCategories.length > 0 && (
+          <section className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">按分类筛选</span>
+              {selectedCategory && (
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className="text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  清除筛选
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
+                  !selectedCategory
+                    ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                    : 'bg-white dark:bg-slate-800 text-foreground border-border/50 hover:border-primary/50 hover:shadow-sm'
+                }`}
+              >
+                🌐 全部
+                <span className="text-xs opacity-70">({news.length})</span>
+              </button>
+              {availableCategories.map(category => {
+                const style = getCategoryStyle(category);
+                const isSelected = selectedCategory === category;
+                return (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(isSelected ? null : category)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
+                      isSelected
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                        : `${style.bgColor} ${style.color} hover:shadow-sm`
+                    }`}
+                  >
+                    {style.emoji} {category}
+                    <span className="text-xs opacity-70">({categoryCounts[category]})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+        
         {/* 加载状态 */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
@@ -271,7 +369,9 @@ export default function HomePage() {
                 <div className="flex items-center gap-2 mb-6">
                   <Newspaper className="w-5 h-5 text-primary" />
                   <h2 className="text-xl font-bold text-foreground">更多资讯</h2>
-                  <span className="text-sm text-muted-foreground">({listNews.length})</span>
+                  <span className="text-sm text-muted-foreground">
+                    ({filteredNews.length}{selectedCategory ? ` · ${selectedCategory}` : ''})
+                  </span>
                 </div>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -285,12 +385,23 @@ export default function HomePage() {
         )}
         
         {/* 空状态 */}
-        {!loading && news.length === 0 && (
+        {!loading && (selectedCategory ? filteredNews.length === 0 : news.length === 0) && (
           <div className="text-center py-16">
             <Newspaper className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-            <p className="text-lg text-muted-foreground mb-2">暂无资讯</p>
+            <p className="text-lg text-muted-foreground mb-2">
+              {selectedCategory ? `没有"${selectedCategory}"分类的资讯` : '暂无资讯'}
+            </p>
             <p className="text-sm text-muted-foreground">
-              每日 6:00 自动采集更新
+              {selectedCategory ? (
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className="text-primary hover:underline"
+                >
+                  查看全部资讯
+                </button>
+              ) : (
+                '每日 6:00 自动采集更新'
+              )}
             </p>
           </div>
         )}

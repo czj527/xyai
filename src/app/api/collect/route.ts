@@ -154,27 +154,34 @@ function getPriority(score: number): NewsItem['priority'] {
   return 'B';
 }
 
-// 判断分类
+// AI资讯分类体系
+const AI_CATEGORIES = {
+  '模型发布': { emoji: '🤖', keywords: ['模型', 'model', 'gpt', 'claude', 'gemini', 'llama', 'qwen', '通义', '文心', '发布', 'release', 'launch', '升级', 'update', '版本', 'version', '新模型', '大模型', 'llm', 'foundation model'] },
+  '政策法规': { emoji: '📋', keywords: ['政策', '法规', '监管', 'regulation', 'policy', 'government', '法律', 'law', '合规', 'compliance', '禁令', 'ban', '许可', 'license', '白宫', '欧盟', 'eu', '中国', 'china', '国务院'] },
+  '定价计划': { emoji: '💰', keywords: ['token', '定价', 'pricing', '计费', 'billing', '套餐', 'plan', '免费', 'free', 'pro', 'enterprise', 'api价格', '降费', '降价', 'credits', '额度', '订阅', 'subscription'] },
+  '工具产品': { emoji: '🔧', keywords: ['工具', 'tool', '产品', 'product', 'app', '应用', '平台', 'platform', '插件', 'plugin', '扩展', 'extension', 'sdk', 'api', '框架', 'framework', '开源', 'open source', 'github', 'agent', '智能体'] },
+  '基准测评': { emoji: '📊', keywords: ['基准', 'benchmark', '测评', '评测', 'eval', '排行', 'ranking', '榜单', 'leaderboard', '性能', 'performance', '跑分', '测试', 'test', '对比', 'comparison', 'arena'] },
+  '研究论文': { emoji: '🔬', keywords: ['论文', 'paper', '研究', 'research', 'arxiv', '学术', '突破', 'breakthrough', '算法', 'algorithm', '训练', 'training', '架构', 'architecture', '注意力', 'attention', 'transformer'] },
+  '融资动态': { emoji: '💼', keywords: ['融资', 'funding', '投资', 'investment', '收购', 'acquisition', '上市', 'ipo', '估值', 'valuation', '亿美元', 'million', 'billion', '轮', 'round', '风投', 'vc'] },
+  '安全伦理': { emoji: '🔒', keywords: ['安全', 'safety', '伦理', 'ethics', '对齐', 'alignment', '偏见', 'bias', '幻觉', 'hallucination', '风险', 'risk', '滥用', 'abuse', 'deepfake', '虚假', '有害'] },
+  '行业资讯': { emoji: '🌐', keywords: [] }, // 默认分类
+};
+
+// 判断分类（改进版）
 function categorize(title: string, description: string): string {
   const text = (title + ' ' + description).toLowerCase();
   
-  if (text.includes('代码') || text.includes('code') || text.includes('programming') || text.includes('coding')) {
-    return '代码';
-  }
-  if (text.includes('开源') || text.includes('open source')) {
-    return '开源';
-  }
-  if (text.includes('安全') || text.includes('security') || text.includes('privacy')) {
-    return '安全';
-  }
-  if (text.includes('产品') || text.includes('product') || text.includes('launch')) {
-    return '产品';
-  }
-  if (text.includes('融资') || text.includes('funding') || text.includes('investment')) {
-    return '融资';
+  // 按优先级匹配分类
+  for (const [category, config] of Object.entries(AI_CATEGORIES)) {
+    if (category === '行业资讯') continue; // 跳过默认分类
+    for (const keyword of config.keywords) {
+      if (text.includes(keyword)) {
+        return category;
+      }
+    }
   }
   
-  return '大模型';
+  return '行业资讯';
 }
 
 // 批量生成摘要（一次性处理多条，节省API调用）
@@ -325,11 +332,13 @@ async function writeToPendingNews(news: NewsItem[]): Promise<{ success: boolean;
   }
 }
 
-// AI 自动审核新闻
+// AI 自动审核新闻 + 智能分类
 async function aiReviewNews(news: NewsItem[]): Promise<(NewsItem & { ai_approved: boolean })[]> {
   if (news.length === 0) return [];
   
-  const prompt = `请审核以下AI新闻，判断是否适合发布到AI资讯网站。
+  const categories = Object.keys(AI_CATEGORIES);
+  
+  const prompt = `请审核以下AI新闻，判断是否适合发布，并进行精确分类。
 
 审核标准：
 1. 必须与AI/人工智能/大模型/机器学习相关
@@ -337,14 +346,18 @@ async function aiReviewNews(news: NewsItem[]): Promise<(NewsItem & { ai_approved
 3. 有一定新闻价值，非纯广告或水文
 4. 标题清晰，非乱码或截断
 
+分类选项（请选择最匹配的一个）：
+${categories.map(c => `- ${c}：${getCategoryDesc(c)}`).join('\n')}
+
 新闻列表：
 ${news.map((item, i) => `${i + 1}. [${item.priority}] ${item.title}\n   来源: ${item.source}`).join('\n\n')}
 
 请返回JSON数组，每个元素包含：
 - approved: boolean (是否通过审核)
 - reason: string (审核理由，简短)
+- category: string (从上面的分类选项中选择)
 
-格式：[{"approved": true, "reason": "AI相关内容"}, ...]`;
+格式：[{"approved": true, "reason": "AI相关内容", "category": "模型发布"}, ...]`;
 
   try {
     const result = await callMiMoAPI(prompt);
@@ -356,6 +369,10 @@ ${news.map((item, i) => `${i + 1}. [${item.priority}] ${item.title}\n   来源: 
         return news.map((item, i) => ({
           ...item,
           ai_approved: reviews[i]?.approved ?? true,
+          // 使用AI分类，如果无效则降级到规则分类
+          category: categories.includes(reviews[i]?.category) 
+            ? reviews[i].category 
+            : item.category,
         }));
       }
     }
@@ -366,6 +383,22 @@ ${news.map((item, i) => `${i + 1}. [${item.priority}] ${item.title}\n   来源: 
     console.error('AI review error, auto-approving:', error);
     return news.map(item => ({ ...item, ai_approved: true }));
   }
+}
+
+// 获取分类描述（用于AI理解）
+function getCategoryDesc(category: string): string {
+  const descs: Record<string, string> = {
+    '模型发布': '新AI模型发布、版本更新、能力升级',
+    '政策法规': 'AI相关政策、法律法规、政府监管',
+    '定价计划': 'Token定价、API计费、订阅套餐变化',
+    '工具产品': 'AI工具、应用、平台、SDK、Agent',
+    '基准测评': '模型评测、排行榜、基准测试、性能对比',
+    '研究论文': '学术论文、技术突破、算法创新',
+    '融资动态': '融资、收购、上市、估值变动',
+    '安全伦理': 'AI安全、伦理问题、对齐研究、风险',
+    '行业资讯': '其他AI行业动态',
+  };
+  return descs[category] || '';
 }
 
 // 将已审核通过的新闻写入日报表
