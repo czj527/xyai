@@ -262,7 +262,7 @@ function VideoPageContent() {
                 <div className="card-divider" />
                 
                 <h1 className="news-title">{currentNews.title}</h1>
-                <p className="news-summary">{currentNews.summary || currentNews.ai_summary}</p>
+                <p className="news-summary">{currentNews.summary}</p>
                 
                 <div className="news-meta">
                   <span className="meta-source">📰 {currentNews.source}</span>

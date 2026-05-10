@@ -9,7 +9,6 @@ interface NewsItem {
   id: string;
   title: string;
   summary: string;
-  ai_summary?: string;
   source: string;
   source_url: string;
   priority: string;
@@ -77,7 +76,7 @@ function generateMarkdown(date: string, news: NewsItem[]): string {
     hotNews.forEach((item, idx) => {
       md += `### ${idx + 1}. ${item.title}\n\n`;
       md += `> **${item.priority}** | ${item.source} | ${item.category}\n\n`;
-      md += `${item.ai_summary || item.summary}\n\n`;
+      md += `${item.summary}\n\n`;
       if (item.source_url) {
         md += `[阅读原文](${item.source_url})\n\n`;
       }
@@ -92,7 +91,7 @@ function generateMarkdown(date: string, news: NewsItem[]): string {
     importantNews.forEach((item, idx) => {
       md += `### ${idx + 1}. ${item.title}\n\n`;
       md += `> **${item.priority}** | ${item.source} | ${item.category}\n\n`;
-      md += `${item.ai_summary || item.summary}\n\n`;
+      md += `${item.summary}\n\n`;
     });
     md += `---\n\n`;
   }
@@ -102,7 +101,7 @@ function generateMarkdown(date: string, news: NewsItem[]): string {
     md += `## 📋 其他资讯\n\n`;
     priorityGroups['B'].forEach((item, idx) => {
       md += `${idx + 1}. **${item.title}** - ${item.source}\n`;
-      md += `   ${item.ai_summary || item.summary}\n\n`;
+      md += `   ${item.summary}\n\n`;
     });
     md += `---\n\n`;
   }

@@ -113,7 +113,7 @@ function FeaturedCard({ news, index }: { news: NewsItem; index: number }) {
         
         {/* 摘要 */}
         <p className="text-sm text-slate-300 line-clamp-3 leading-relaxed mb-4">
-          {news.summary || news.ai_summary}
+          {news.summary}
         </p>
         
         {/* 底部信息 */}
@@ -158,7 +158,7 @@ function NewsListItem({ news, index }: { news: NewsItem; index: number }) {
           </h3>
           
           <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-            {news.summary || news.ai_summary}
+            {news.summary}
           </p>
           
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
