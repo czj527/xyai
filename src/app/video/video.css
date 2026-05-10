@@ -104,6 +104,12 @@
   gap: 16px;
 }
 
+.nav-links-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .nav-link {
   display: flex;
   align-items: center;

@@ -1,7 +1,8 @@
 // 资讯采集API路由
-// 复用旧方案采集逻辑，接入MiMo API进行摘要生成
+// 采集RSS → AI过滤评分 → MiMo摘要 → 写入Supabase
 
 import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase';
 
 // 信息源配置（RSS）
 const RSS_SOURCES = [
@@ -30,12 +31,15 @@ interface NewsItem {
   priority: 'SSS' | 'SS' | 'S' | 'A' | 'B';
   category: string;
   published_at: string;
+  ai_summary?: string;
+  core_facts?: string[];
+  key_data?: string[];
 }
 
 // MiMo API 调用
 async function callMiMoAPI(prompt: string): Promise<string> {
   const apiKey = process.env.MIMO_API_KEY;
-  const baseUrl = process.env.MIMO_BASE_URL || 'https://api.xiaomimimo.com/v1';
+  const baseUrl = process.env.MIMO_BASE_URL || 'https://token-plan-cn.xiaomimimo.com/v1';
   
   if (!apiKey) {
     throw new Error('MIMO_API_KEY not configured');
@@ -48,31 +52,32 @@ async function callMiMoAPI(prompt: string): Promise<string> {
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'MiMo-8B-FunctionCall-4bit',
+      model: 'mimo-v2-pro',
       messages: [
         { role: 'user', content: prompt },
       ],
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 800,
     }),
   });
   
   if (!response.ok) {
-    throw new Error(`MiMo API error: ${response.status}`);
+    const errText = await response.text().catch(() => '');
+    throw new Error(`MiMo API error: ${response.status} ${errText}`);
   }
   
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
 }
 
-// RSS抓取（使用内置fetch）
+// RSS抓取
 async function fetchRSS(url: string): Promise<any[]> {
   try {
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; XyAI-Bot/1.0)',
       },
-      next: { revalidate: 300 }, // 5分钟缓存
+      signal: AbortSignal.timeout(15000),
     });
     
     if (!response.ok) {
@@ -81,7 +86,6 @@ async function fetchRSS(url: string): Promise<any[]> {
     }
     
     const text = await response.text();
-    // 简单的XML解析（生产环境应使用专门的RSS解析库）
     const items = parseSimpleRSS(text);
     return items;
   } catch (error) {
@@ -149,7 +153,7 @@ function scoreNews(title: string, description: string): number {
   }
   
   // 高权重关键词
-  const highWeightKeywords = ['gpt-5', 'claude 4', 'gemini 3', '发布', '发布', '开源', 'release', 'announced'];
+  const highWeightKeywords = ['gpt-5', 'claude 4', 'gemini 3', '发布', '开源', 'release', 'announced', 'breakthrough'];
   for (const keyword of highWeightKeywords) {
     if (text.includes(keyword.toLowerCase())) {
       score += 15;
@@ -172,13 +176,13 @@ function getPriority(score: number): NewsItem['priority'] {
 function categorize(title: string, description: string): string {
   const text = (title + ' ' + description).toLowerCase();
   
-  if (text.includes('代码') || text.includes('code') || text.includes('programming')) {
+  if (text.includes('代码') || text.includes('code') || text.includes('programming') || text.includes('coding')) {
     return '代码';
   }
   if (text.includes('开源') || text.includes('open source')) {
     return '开源';
   }
-  if (text.includes('安全') || text.includes('安全') || text.includes('privacy')) {
+  if (text.includes('安全') || text.includes('security') || text.includes('privacy')) {
     return '安全';
   }
   if (text.includes('产品') || text.includes('product') || text.includes('launch')) {
@@ -191,7 +195,50 @@ function categorize(title: string, description: string): string {
   return '大模型';
 }
 
-// 生成摘要（使用MiMo）
+// 批量生成摘要（一次性处理多条，节省API调用）
+async function generateBatchSummary(items: { title: string; description: string }[]): Promise<string[]> {
+  if (items.length === 0) return [];
+  
+  // 如果只有1条，直接单独生成
+  if (items.length === 1) {
+    const summary = await generateSummary(items[0].title, items[0].description);
+    return [summary];
+  }
+  
+  // 批量生成：将多条新闻合并到一个prompt中
+  const newsList = items.map((item, i) => 
+    `${i + 1}. 标题：${item.title}\n   内容：${item.description.slice(0, 300)}`
+  ).join('\n\n');
+  
+  const prompt = `请为以下AI新闻各生成50字以内的中文摘要，用JSON数组格式返回：
+
+${newsList}
+
+要求：
+1. 提取关键信息
+2. 语言简洁专业
+3. 每条50字以内
+4. 返回格式：["摘要1", "摘要2", ...]`;
+
+  try {
+    const result = await callMiMoAPI(prompt);
+    // 尝试解析JSON数组
+    const jsonMatch = result.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const summaries = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(summaries) && summaries.length === items.length) {
+        return summaries.map((s: string) => String(s).slice(0, 100));
+      }
+    }
+    // 解析失败，降级为逐条截取
+    return items.map(item => item.description.slice(0, 100));
+  } catch (error) {
+    console.error('Batch summary error, using fallback:', error);
+    return items.map(item => item.description.slice(0, 100));
+  }
+}
+
+// 单条摘要生成（降级用）
 async function generateSummary(title: string, description: string): Promise<string> {
   const prompt = `请为以下AI新闻生成50字以内的中文摘要：
 
@@ -212,13 +259,106 @@ async function generateSummary(title: string, description: string): Promise<stri
   }
 }
 
+// 从Supabase获取已有新闻标题（用于去重）
+async function getExistingTitles(): Promise<Set<string>> {
+  try {
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    
+    const { data, error } = await supabaseAdmin
+      .from('xyai_daily_reports')
+      .select('news')
+      .gte('date', threeDaysAgo.toISOString().split('T')[0]);
+    
+    if (error || !data) return new Set();
+    
+    const titles = new Set<string>();
+    for (const report of data) {
+      if (report.news && Array.isArray(report.news)) {
+        for (const item of report.news) {
+          if (item.title) {
+            titles.add(item.title.toLowerCase().trim());
+          }
+        }
+      }
+    }
+    return titles;
+  } catch {
+    return new Set();
+  }
+}
+
+// 写入Supabase
+async function writeToSupabase(news: NewsItem[]): Promise<{ success: boolean; error?: string }> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const hour = new Date().getHours();
+    const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+    
+    // 查询今天同期是否已有数据
+    const { data: existing } = await supabaseAdmin
+      .from('xyai_daily_reports')
+      .select('id, news')
+      .eq('date', today)
+      .eq('period', period)
+      .single();
+    
+    if (existing) {
+      // 合并已有数据（去重）
+      const existingTitles = new Set(
+        (existing.news || []).map((n: NewsItem) => n.title.toLowerCase().trim())
+      );
+      const newNews = news.filter(n => !existingTitles.has(n.title.toLowerCase().trim()));
+      
+      if (newNews.length === 0) {
+        return { success: true };
+      }
+      
+      const mergedNews = [...(existing.news || []), ...newNews];
+      const { error } = await supabaseAdmin
+        .from('xyai_daily_reports')
+        .update({ news: mergedNews })
+        .eq('id', existing.id);
+      
+      if (error) {
+        console.error('Supabase update error:', error);
+        return { success: false, error: error.message };
+      }
+    } else {
+      // 插入新记录
+      const { error } = await supabaseAdmin
+        .from('xyai_daily_reports')
+        .insert({
+          date: today,
+          period,
+          news,
+          headline: news[0]?.title || null,
+        });
+      
+      if (error) {
+        console.error('Supabase insert error:', error);
+        return { success: false, error: error.message };
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Supabase write error:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
 // POST: 手动触发采集
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { source } = body;
+    const { source, dry_run } = body as { source?: string; dry_run?: boolean };
     
-    console.log('[采集Agent] 开始采集资讯', { source });
+    console.log('[采集Agent] 开始采集资讯', { source, dry_run });
+    
+    // 获取已有标题用于去重
+    const existingTitles = await getExistingTitles();
+    console.log(`[采集Agent] 已有 ${existingTitles.size} 条历史标题`);
     
     const results: NewsItem[] = [];
     const sourcesToFetch = source 
@@ -228,18 +368,17 @@ export async function POST(request: Request) {
     // 采集所有RSS源
     for (const sourceConfig of sourcesToFetch) {
       const items = await fetchRSS(sourceConfig.url);
+      console.log(`[采集Agent] ${sourceConfig.name}: 获取 ${items.length} 条`);
       
       for (const item of items) {
         const score = scoreNews(item.title, item.description);
         
-        // 只保留AI相关且评分较高的
-        if (score >= 15) {
-          const summary = await generateSummary(item.title, item.description);
-          
+        // 只保留AI相关且评分较高的，且去重
+        if (score >= 15 && !existingTitles.has(item.title.toLowerCase().trim())) {
           results.push({
             id: `news-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             title: item.title,
-            summary,
+            summary: '', // 稍后批量生成
             source: sourceConfig.name,
             source_url: item.link,
             priority: getPriority(score),
@@ -258,12 +397,42 @@ export async function POST(request: Request) {
       })
       .slice(0, 15);
     
-    console.log(`[采集Agent] 采集完成，共${sortedResults.length}条资讯`);
+    console.log(`[采集Agent] 过滤后 ${sortedResults.length} 条待处理`);
+    
+    // 批量生成摘要
+    if (sortedResults.length > 0) {
+      const summaries = await generateBatchSummary(
+        sortedResults.map(r => ({ title: r.title, description: r.summary || '' }))
+      );
+      sortedResults.forEach((item, i) => {
+        item.summary = summaries[i] || item.title;
+      });
+    }
+    
+    // dry_run模式：只返回结果，不写入数据库
+    if (dry_run) {
+      return NextResponse.json({
+        success: true,
+        count: sortedResults.length,
+        news: sortedResults,
+        dry_run: true,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    
+    // 写入Supabase
+    let dbResult = { success: true };
+    if (sortedResults.length > 0) {
+      dbResult = await writeToSupabase(sortedResults);
+    }
+    
+    console.log(`[采集Agent] 采集完成，${sortedResults.length}条，写入DB: ${dbResult.success}`);
     
     return NextResponse.json({
       success: true,
       count: sortedResults.length,
       news: sortedResults,
+      db_write: dbResult,
       timestamp: new Date().toISOString(),
     });
     
@@ -285,6 +454,7 @@ export async function GET() {
       priority: s.priority,
       available: true,
     })),
+    model: 'mimo-v2-pro',
     timestamp: new Date().toISOString(),
   });
 }

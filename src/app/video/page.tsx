@@ -12,7 +12,10 @@ import {
   Eye,
   FileText,
   EyeOff,
-  Menu
+  Menu,
+  BarChart3,
+  Archive,
+  Info
 } from 'lucide-react';
 import type { NewsItem } from '@/lib/supabase';
 import './video.css';
@@ -201,10 +204,24 @@ function VideoPageContent() {
       <div className="video-container">
         <header className={'video-navbar ' + (isNavbarHidden ? 'hidden' : '')}>
           <div className="navbar-content">
-            <Link href="/" className="nav-link nav-home">
-              <Home className="w-4 h-4" />
-              <span>首页</span>
-            </Link>
+            <div className="nav-links-group">
+              <Link href="/" className="nav-link nav-home">
+                <Home className="w-4 h-4" />
+                <span>首页</span>
+              </Link>
+              <Link href="/rankings" className="nav-link">
+                <BarChart3 className="w-4 h-4" />
+                <span>榜单</span>
+              </Link>
+              <Link href="/archive" className="nav-link">
+                <Archive className="w-4 h-4" />
+                <span>归档</span>
+              </Link>
+              <Link href="/about" className="nav-link">
+                <Info className="w-4 h-4" />
+                <span>关于</span>
+              </Link>
+            </div>
             
             <div className="nav-center">
               <span className="nav-date flex items-center gap-1">
