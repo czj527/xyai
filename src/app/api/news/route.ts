@@ -2,7 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import type { NewsItem } from '@/lib/supabase';
 
-// 数据格式规范化：字符串→数组，空summary用ai_summary兜底
+// 新分类系统
+const AI_CATEGORIES: Record<string, string[]> = {
+  '模型发布': ['模型', 'model', 'gpt', 'claude', 'gemini', 'llama', 'qwen', '通义', '文心', '发布', 'release', 'launch', '升级', 'update', '版本', 'version', '新模型', '大模型', 'llm', 'foundation model'],
+  '工具发布': ['工具', 'tool', '产品', 'product', 'app', '应用', '平台', 'platform', '插件', 'plugin', '扩展', 'extension', 'sdk', 'api', '框架', 'framework', '开源', 'open source', 'github', 'agent', '智能体'],
+  '政策融资': ['政策', '法规', '监管', 'regulation', 'policy', '融资', 'funding', '投资', 'investment', '收购', 'acquisition', '上市', 'ipo', '估值', 'valuation', '亿美元', 'million', 'billion', '轮', 'round', '风投', 'vc', '政府', 'government'],
+};
+
+// 自动分类函数
+function autoCategorize(title: string, summary: string = ''): string {
+  const text = (title + ' ' + summary).toLowerCase();
+  for (const [category, keywords] of Object.entries(AI_CATEGORIES)) {
+    for (const keyword of keywords) {
+      if (text.includes(keyword.toLowerCase())) {
+        return category;
+      }
+    }
+  }
+  return '项目相关';
+}
+
+// 数据格式规范化：字符串→数组，空summary用ai_summary兜底，自动分类
 function normalizeNewsItem(n: any): NewsItem {
   const item = { ...n };
   if (!item.summary || item.summary.trim() === '') {
@@ -23,6 +43,13 @@ function normalizeNewsItem(n: any): NewsItem {
   if (!Array.isArray(item.related_links)) {
     item.related_links = [];
   }
+  
+  // 自动分类（如果分类不在新系统中）
+  const validCategories = ['模型发布', '工具发布', '政策融资', '项目相关'];
+  if (!validCategories.includes(item.category)) {
+    item.category = autoCategorize(item.title || '', item.summary || '');
+  }
+  
   return item as NewsItem;
 }
 
@@ -114,6 +141,9 @@ export async function GET(request: NextRequest) {
         new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
       );
     }
+
+    // 自动分类（使用 normalizeNewsItem）
+    allNews = allNews.map(n => normalizeNewsItem(n));
 
     // 分页
     const total = allNews.length;
