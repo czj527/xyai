@@ -57,7 +57,6 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
       if (result.success && result.data && result.data.length > 0) {
         setCurrentNews(result.data);
       } else {
-        // 如果API无数据，使用空数组，页面会显示空状态
         setCurrentNews([]);
       }
     } catch (err) {
@@ -77,7 +76,6 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
       if (response.ok) {
         const data = await response.json();
         setScriptData(data);
-        // 如果脚本中有items，转换为NewsItem格式
         if (data.items && data.items.length > 0) {
           const newsFromScript: NewsItem[] = data.items.map((item: ScriptItem, idx: number) => ({
             id: `script-${idx}`,
@@ -97,37 +95,30 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
   }, []);
 
   useEffect(() => {
-    // 解析URL参数
     const initParams = async () => {
       const p = await searchParams;
       
-      // 设置日期
       if (p.date) {
         setDisplayedDate(p.date);
-        // 如果是script模式，加载对应日期的脚本
         if (p.script === 'true') {
           setIsScriptMode(true);
           await fetchScriptData(p.date);
         }
       } else {
-        // 使用今天
         const today = new Date();
         setDisplayedDate(today.toISOString().split('T')[0]);
       }
       
-      // 设置时段标签
       if (p.period) {
         if (p.period === 'morning') setPeriodLabel('早报');
         else if (p.period === 'afternoon') setPeriodLabel('午报');
         else if (p.period === 'evening') setPeriodLabel('晚报');
       }
       
-      // 设置自动播放
       if (p.autoplay === 'true') {
         setAutoplay(true);
       }
       
-      // 如果不是脚本模式，从API获取数据
       if (p.script !== 'true') {
         await fetchNews();
       }
@@ -135,7 +126,6 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
     
     initParams();
     
-    // 计算期号
     const startDate = new Date('2024-01-01');
     const today = new Date();
     const daysDiff = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -190,7 +180,7 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
 
   return (
     <div className="video-page">
-      {/* 花瓣飘落动画 */}
+      {/* 花瓣飘落动画 - 浅粉色 */}
       <div className="petals-container">
         {Array.from({ length: 20 }).map((_, i) => (
           <div
@@ -210,7 +200,7 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
         {/* 顶部标题区 */}
         <header className="video-header">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/50 shadow-lg">
+            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-300 shadow-lg">
               <Image
                 src="/images/avatar-green.jpg"
                 alt="绿"
@@ -220,10 +210,10 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
               />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white drop-shadow-lg">
+              <h1 className="text-2xl font-bold text-emerald-800 drop-shadow-sm">
                 🌿 新叶{periodLabel}
               </h1>
-              <p className="text-sm text-white/80">
+              <p className="text-base text-emerald-700">
                 {formatDateDisplay(displayedDate)} · 第{issueNumber}期
               </p>
             </div>
@@ -233,29 +223,29 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
         {/* 新闻列表区 */}
         <main className="video-main">
           {isLoading ? (
-            <div className="flex items-center justify-center h-full text-white/80">
+            <div className="flex items-center justify-center h-full text-emerald-800">
               <div className="text-center">
-                <div className="animate-pulse mb-2">加载中...</div>
-                <div className="text-sm text-white/60">正在从Supabase获取数据</div>
+                <div className="animate-pulse mb-2 text-lg">加载中...</div>
+                <div className="text-sm text-emerald-600">正在从Supabase获取数据</div>
               </div>
             </div>
           ) : error ? (
-            <div className="flex items-center justify-center h-full text-white/80">
-              <div className="text-center text-red-400">{error}</div>
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center text-red-600 text-lg">{error}</div>
             </div>
           ) : currentNews.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-white/80">
+            <div className="flex items-center justify-center h-full text-emerald-800">
               <div className="text-center">
-                <p>暂无数据</p>
-                <p className="text-sm text-white/60 mt-2">请检查Supabase数据库</p>
+                <p className="text-lg">暂无数据</p>
+                <p className="text-sm text-emerald-600 mt-2">请检查Supabase数据库</p>
               </div>
             </div>
           ) : (
             <>
               {/* 脚本模式：显示开场白 */}
               {isScriptMode && scriptData?.opening && currentIndex === 0 && (
-                <div className="script-intro mb-4 p-4 bg-white/10 rounded-lg">
-                  <p className="text-white/90 text-lg">{scriptData.opening}</p>
+                <div className="script-intro mb-4 p-4 rounded-lg">
+                  <p className="text-emerald-900 text-lg font-medium leading-relaxed">{scriptData.opening}</p>
                 </div>
               )}
             
@@ -278,16 +268,16 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
                     
                     {/* 内容 */}
                     <div className="news-content">
-                      <div className="news-title-row">
-                        <span className={`news-priority-badge ${priorityStyle.bg} ${priorityStyle.text}`}>
+                      <div className="news-title-row flex items-center gap-2 flex-wrap">
+                        <span className={`news-priority-badge ${priorityStyle.bg} ${priorityStyle.text} px-2 py-0.5 rounded text-xs font-bold`}>
                           {news.priority}
                         </span>
-                        <h2 className="news-title">{news.title}</h2>
+                        <h2 className="news-title text-lg font-semibold text-gray-800">{news.title}</h2>
                       </div>
-                      <p className="news-summary">{news.summary}</p>
-                      <div className="news-meta">
-                        <span className="news-source">{news.source}</span>
-                        <span className="news-category">{news.category}</span>
+                      <p className="news-summary mt-2 text-gray-600 leading-relaxed">{news.summary}</p>
+                      <div className="news-meta mt-3 flex items-center gap-3 text-sm">
+                        <span className="news-source text-emerald-600 font-medium">📰 {news.source}</span>
+                        <span className="news-category px-2 py-0.5 rounded-full text-emerald-700 text-xs">{news.category}</span>
                       </div>
                     </div>
                   </div>
@@ -296,8 +286,8 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
             
               {/* 脚本模式：显示结束语 */}
               {isScriptMode && scriptData?.closing && currentIndex === currentNews.length - 1 && (
-                <div className="script-outro mt-4 p-4 bg-white/10 rounded-lg">
-                  <p className="text-white/90 text-lg">{scriptData.closing}</p>
+                <div className="script-outro mt-4 p-4 rounded-lg">
+                  <p className="text-emerald-900 text-lg font-medium leading-relaxed">{scriptData.closing}</p>
                 </div>
               )}
             </>
@@ -306,10 +296,10 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
         
         {/* 底部来源标注 */}
         <footer className="video-footer">
-          <div className="footer-content">
-            <span>🌸 数据来源: 量子位 · 机器之心 · HackerNews</span>
-            <div className="footer-brand">
-              <div className="w-5 h-5 rounded-full overflow-hidden border border-white/50">
+          <div className="footer-content flex items-center justify-between">
+            <span className="text-sm">🌸 数据来源: 量子位 · 机器之心 · HackerNews</span>
+            <div className="footer-brand flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full overflow-hidden border border-emerald-300">
                 <Image
                   src="/images/avatar-green.jpg"
                   alt="绿"
@@ -318,7 +308,7 @@ export default function VideoPage({ searchParams }: VideoPageProps) {
                   className="w-full h-full object-cover"
                 />
               </div>
-              <span>新叶早报</span>
+              <span className="text-sm font-medium">新叶早报</span>
             </div>
           </div>
         </footer>
