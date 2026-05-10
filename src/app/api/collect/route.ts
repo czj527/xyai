@@ -3,15 +3,34 @@
 
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import Parser from 'rss-parser';
+
+// RSS解析器（带自定义字段）
+const rssParser = new Parser({
+  timeout: 15000,
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (compatible; XyAI-Bot/1.0)',
+  },
+  customFields: {
+    item: ['media:content', 'media:thumbnail'],
+  },
+});
 
 // 信息源配置（RSS）
 const RSS_SOURCES = [
-  { name: '量子位', url: 'https://www.qbitai.com/feed', priority: 5 },
-  { name: '机器之心', url: 'https://www.jiqizhixin.com/rss', priority: 5 },
-  { name: '36氪', url: 'https://36kr.com/feed', priority: 4 },
-  { name: 'HackerNews', url: 'https://hnrss.org/frontpage', priority: 3 },
-  { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml', priority: 5 },
-  { name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', priority: 3 },
+  // 中文源
+  { name: '量子位', url: 'https://www.qbitai.com/feed', priority: 5, lang: 'zh' },
+  { name: '机器之心', url: 'https://www.jiqizhixin.com/rss', priority: 5, lang: 'zh' },
+  { name: '36氪', url: 'https://36kr.com/feed', priority: 4, lang: 'zh' },
+  // 英文源
+  { name: 'HackerNews', url: 'https://hnrss.org/frontpage', priority: 3, lang: 'en' },
+  { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml', priority: 5, lang: 'en' },
+  { name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', priority: 3, lang: 'en' },
+  // 新增源
+  { name: 'arXiv CS.AI', url: 'https://rss.arxiv.org/rss/cs.AI', priority: 4, lang: 'en' },
+  { name: 'HuggingFace Blog', url: 'https://huggingface.co/blog/feed.xml', priority: 4, lang: 'en' },
+  { name: 'The Verge AI', url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml', priority: 3, lang: 'en' },
+  { name: 'MIT Tech Review AI', url: 'https://www.technologyreview.com/feed/', priority: 4, lang: 'en' },
 ];
 
 // 关键词过滤
@@ -70,61 +89,23 @@ async function callMiMoAPI(prompt: string): Promise<string> {
   return data.choices?.[0]?.message?.content || '';
 }
 
-// RSS抓取
-async function fetchRSS(url: string): Promise<any[]> {
+// RSS抓取（使用rss-parser库）
+async function fetchRSS(url: string): Promise<{ title: string; link: string; description: string; pubDate: string }[]> {
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; XyAI-Bot/1.0)',
-      },
-      signal: AbortSignal.timeout(15000),
-    });
+    const feed = await rssParser.parseURL(url);
     
-    if (!response.ok) {
-      console.error(`Failed to fetch RSS: ${url}`, response.status);
-      return [];
-    }
-    
-    const text = await response.text();
-    const items = parseSimpleRSS(text);
-    return items;
+    return (feed.items || [])
+      .filter(item => item.title && item.link)
+      .map(item => ({
+        title: cleanHtml(item.title || ''),
+        link: item.link || '',
+        description: cleanHtml(item.contentSnippet || item.content || item.summary || ''),
+        pubDate: item.pubDate || item.isoDate || '',
+      }));
   } catch (error) {
     console.error(`Error fetching RSS: ${url}`, error);
     return [];
   }
-}
-
-// 简化的RSS解析
-function parseSimpleRSS(xml: string): any[] {
-  const items: any[] = [];
-  const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/gi;
-  let match;
-  
-  while ((match = itemRegex.exec(xml)) !== null) {
-    const itemXml = match[1];
-    const title = extractXmlTag(itemXml, 'title');
-    const link = extractXmlTag(itemXml, 'link');
-    const description = extractXmlTag(itemXml, 'description');
-    const pubDate = extractXmlTag(itemXml, 'pubDate');
-    
-    if (title && link) {
-      items.push({
-        title: cleanHtml(title),
-        link,
-        description: cleanHtml(description || ''),
-        pubDate,
-      });
-    }
-  }
-  
-  return items;
-}
-
-// 提取XML标签内容
-function extractXmlTag(xml: string, tag: string): string {
-  const regex = new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([^\\]]*?)\\]\\]></${tag}>|<${tag}[^>]*>([^<]*)</${tag}>`, 'i');
-  const match = xml.match(regex);
-  return match ? (match[1] || match[2] || '').trim() : '';
 }
 
 // 清理HTML标签
@@ -137,6 +118,7 @@ function cleanHtml(html: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -288,62 +270,47 @@ async function getExistingTitles(): Promise<Set<string>> {
   }
 }
 
-// 写入Supabase
-async function writeToSupabase(news: NewsItem[]): Promise<{ success: boolean; error?: string }> {
+// 写入待审核表
+async function writeToPendingNews(news: NewsItem[]): Promise<{ success: boolean; error?: string; count?: number }> {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const hour = new Date().getHours();
-    const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
-    
-    // 查询今天同期是否已有数据
+    // 先检查 source_url 去重
+    const sourceUrls = news.map(n => n.source_url).filter(Boolean);
     const { data: existing } = await supabaseAdmin
-      .from('xyai_daily_reports')
-      .select('id, news')
-      .eq('date', today)
-      .eq('period', period)
-      .single();
+      .from('xyai_pending_news')
+      .select('source_url')
+      .in('source_url', sourceUrls);
     
-    if (existing) {
-      // 合并已有数据（去重）
-      const existingTitles = new Set(
-        (existing.news || []).map((n: NewsItem) => n.title.toLowerCase().trim())
-      );
-      const newNews = news.filter(n => !existingTitles.has(n.title.toLowerCase().trim()));
-      
-      if (newNews.length === 0) {
-        return { success: true };
-      }
-      
-      const mergedNews = [...(existing.news || []), ...newNews];
-      const { error } = await supabaseAdmin
-        .from('xyai_daily_reports')
-        .update({ news: mergedNews })
-        .eq('id', existing.id);
-      
-      if (error) {
-        console.error('Supabase update error:', error);
-        return { success: false, error: error.message };
-      }
-    } else {
-      // 插入新记录
-      const { error } = await supabaseAdmin
-        .from('xyai_daily_reports')
-        .insert({
-          date: today,
-          period,
-          news,
-          headline: news[0]?.title || null,
-        });
-      
-      if (error) {
-        console.error('Supabase insert error:', error);
-        return { success: false, error: error.message };
-      }
+    const existingUrls = new Set((existing || []).map(e => e.source_url));
+    const newNews = news.filter(n => !existingUrls.has(n.source_url));
+    
+    if (newNews.length === 0) {
+      return { success: true, count: 0 };
     }
     
-    return { success: true };
+    // 批量插入待审核表
+    const rows = newNews.map(item => ({
+      title: item.title,
+      summary: item.summary,
+      source: item.source,
+      source_url: item.source_url,
+      priority: item.priority,
+      category: item.category,
+      published_at: item.published_at,
+      status: 'draft',
+    }));
+    
+    const { error } = await supabaseAdmin
+      .from('xyai_pending_news')
+      .insert(rows);
+    
+    if (error) {
+      console.error('Pending news insert error:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, count: newNews.length };
   } catch (error) {
-    console.error('Supabase write error:', error);
+    console.error('Pending news write error:', error);
     return { success: false, error: String(error) };
   }
 }
@@ -420,13 +387,13 @@ export async function POST(request: Request) {
       });
     }
     
-    // 写入Supabase
-    let dbResult = { success: true };
+    // 写入待审核表
+    let dbResult = { success: true, count: 0 };
     if (sortedResults.length > 0) {
-      dbResult = await writeToSupabase(sortedResults);
+      dbResult = await writeToPendingNews(sortedResults);
     }
     
-    console.log(`[采集Agent] 采集完成，${sortedResults.length}条，写入DB: ${dbResult.success}`);
+    console.log(`[采集Agent] 采集完成，${sortedResults.length}条，待审核: ${dbResult.count}`);
     
     return NextResponse.json({
       success: true,
