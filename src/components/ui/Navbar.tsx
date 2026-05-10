@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Home, BarChart3, Archive, Info, Video, FileText, History } from 'lucide-react';
+import { Home, BarChart3, Archive, Info, Video, FileText, History, Shield } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 const navItems = [
@@ -14,6 +14,9 @@ const navItems = [
   { href: '/report', label: '日报', icon: FileText },
   { href: '/about', label: '关于', icon: Info },
 ];
+
+// 管理员入口（不在主导航显示，通过特定方式访问）
+const adminPath = '/admin/dashboard';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -59,8 +62,21 @@ export function Navbar() {
               })}
             </div>
             
-            {/* 主题切换 */}
-            <ThemeToggle />
+            {/* 主题切换 + 管理员入口 */}
+            <div className="flex items-center gap-2">
+              <Link
+                href={adminPath}
+                className={`p-2 rounded-lg transition-colors ${
+                  pathname === adminPath
+                    ? 'text-primary bg-primary/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+                title="管理后台"
+              >
+                <Shield className="w-5 h-5" />
+              </Link>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </nav>
