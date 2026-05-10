@@ -154,17 +154,12 @@ function getPriority(score: number): NewsItem['priority'] {
   return 'B';
 }
 
-// AI资讯分类体系
+// AI资讯分类体系（简化版）
 const AI_CATEGORIES = {
   '模型发布': { emoji: '🤖', keywords: ['模型', 'model', 'gpt', 'claude', 'gemini', 'llama', 'qwen', '通义', '文心', '发布', 'release', 'launch', '升级', 'update', '版本', 'version', '新模型', '大模型', 'llm', 'foundation model'] },
-  '政策法规': { emoji: '📋', keywords: ['政策', '法规', '监管', 'regulation', 'policy', 'government', '法律', 'law', '合规', 'compliance', '禁令', 'ban', '许可', 'license', '白宫', '欧盟', 'eu', '中国', 'china', '国务院'] },
-  '定价计划': { emoji: '💰', keywords: ['token', '定价', 'pricing', '计费', 'billing', '套餐', 'plan', '免费', 'free', 'pro', 'enterprise', 'api价格', '降费', '降价', 'credits', '额度', '订阅', 'subscription'] },
-  '工具产品': { emoji: '🔧', keywords: ['工具', 'tool', '产品', 'product', 'app', '应用', '平台', 'platform', '插件', 'plugin', '扩展', 'extension', 'sdk', 'api', '框架', 'framework', '开源', 'open source', 'github', 'agent', '智能体'] },
-  '基准测评': { emoji: '📊', keywords: ['基准', 'benchmark', '测评', '评测', 'eval', '排行', 'ranking', '榜单', 'leaderboard', '性能', 'performance', '跑分', '测试', 'test', '对比', 'comparison', 'arena'] },
-  '研究论文': { emoji: '🔬', keywords: ['论文', 'paper', '研究', 'research', 'arxiv', '学术', '突破', 'breakthrough', '算法', 'algorithm', '训练', 'training', '架构', 'architecture', '注意力', 'attention', 'transformer'] },
-  '融资动态': { emoji: '💼', keywords: ['融资', 'funding', '投资', 'investment', '收购', 'acquisition', '上市', 'ipo', '估值', 'valuation', '亿美元', 'million', 'billion', '轮', 'round', '风投', 'vc'] },
-  '安全伦理': { emoji: '🔒', keywords: ['安全', 'safety', '伦理', 'ethics', '对齐', 'alignment', '偏见', 'bias', '幻觉', 'hallucination', '风险', 'risk', '滥用', 'abuse', 'deepfake', '虚假', '有害'] },
-  '行业资讯': { emoji: '🌐', keywords: [] }, // 默认分类
+  '工具发布': { emoji: '🔧', keywords: ['工具', 'tool', '产品', 'product', 'app', '应用', '平台', 'platform', '插件', 'plugin', '扩展', 'extension', 'sdk', 'api', '框架', 'framework', '开源', 'open source', 'github', 'agent', '智能体'] },
+  '政策融资': { emoji: '💰', keywords: ['政策', '法规', '监管', 'regulation', 'policy', '融资', 'funding', '投资', 'investment', '收购', 'acquisition', '上市', 'ipo', '估值', 'valuation', '亿美元', 'million', 'billion', '轮', 'round', '风投', 'vc', '政府', 'government'] },
+  '项目相关': { emoji: '📦', keywords: [] }, // 默认分类
 };
 
 // 判断分类（改进版）
@@ -181,7 +176,7 @@ function categorize(title: string, description: string): string {
     }
   }
   
-  return '行业资讯';
+  return '项目相关';
 }
 
 // 批量生成摘要（一次性处理多条，节省API调用）

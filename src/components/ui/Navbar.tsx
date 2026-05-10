@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Home, BarChart3, Archive, Info, Video, FileText } from 'lucide-react';
+import { Home, BarChart3, Archive, Info, Video, FileText, History } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 const navItems = [
   { href: '/', label: '首页', icon: Home },
+  { href: '/history', label: '历史', icon: History },
   { href: '/rankings', label: '榜单', icon: BarChart3 },
-  { href: '/archive', label: '归档', icon: Archive },
   { href: '/video', label: '视频', icon: Video },
   { href: '/report', label: '日报', icon: FileText },
   { href: '/about', label: '关于', icon: Info },
