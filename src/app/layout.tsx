@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Navbar } from "@/components/ui/Navbar";
-import { SpringParticles } from "@/components/effects/SpringParticles";
-import { GreenChatbot } from "@/components/ui/GreenChatbot";
+import { LayoutWrapper } from "@/components/ui/LayoutWrapper";
 
 export const metadata: Metadata = {
   title: "新叶AI - AI资讯早报",
@@ -28,19 +26,9 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="min-h-screen flex flex-col bg-background text-foreground">
-        {/* 春季粒子飘落效果 */}
-        <SpringParticles />
-        
-        {/* 导航栏 */}
-        <Navbar />
-        
-        {/* 主内容区 */}
-        <main className="flex-1 relative z-10 pb-20 md:pb-0">
+        <LayoutWrapper>
           {children}
-        </main>
-        
-        {/* AI 对话助手 */}
-        <GreenChatbot />
+        </LayoutWrapper>
       </body>
     </html>
   );
