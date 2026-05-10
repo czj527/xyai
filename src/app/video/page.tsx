@@ -11,8 +11,12 @@ import {
   FileText,
   EyeOff,
   Menu,
-  Download,
-  Home
+  Home,
+  Filter,
+  Bot,
+  Wrench,
+  DollarSign,
+  Package
 } from 'lucide-react';
 import type { NewsItem } from '@/lib/supabase';
 import './video.css';
@@ -24,10 +28,18 @@ interface ExtendedNewsItem extends NewsItem {
 
 type ViewMode = 'summary' | 'detail';
 
+// 分类配置
+const categoryConfig = {
+  '模型发布': { icon: Bot, color: 'text-purple-600', bg: 'bg-purple-100' },
+  '工具发布': { icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-100' },
+  '政策融资': { icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-100' },
+  '项目相关': { icon: Package, color: 'text-green-600', bg: 'bg-green-100' },
+};
+
 const priorityConfig = {
-  SSS: { label: 'SSS', bgColor: 'bg-amber-500', textColor: 'text-white' },
-  SS: { label: 'SS', bgColor: 'bg-pink-500', textColor: 'text-white' },
-  S: { label: 'S', bgColor: 'bg-emerald-500', textColor: 'text-white' },
+  SSS: { label: 'SSS', bgColor: 'bg-red-500', textColor: 'text-white' },
+  SS: { label: 'SS', bgColor: 'bg-orange-500', textColor: 'text-white' },
+  S: { label: 'S', bgColor: 'bg-yellow-500', textColor: 'text-white' },
   A: { label: 'A', bgColor: 'bg-blue-500', textColor: 'text-white' },
   B: { label: 'B', bgColor: 'bg-gray-500', textColor: 'text-white' },
 };
@@ -43,22 +55,26 @@ function VideoPageContent() {
   const searchParams = useSearchParams();
   
   const [allNews, setAllNews] = useState<ExtendedNewsItem[]>([]);
+  const [filteredNews, setFilteredNews] = useState<ExtendedNewsItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>('summary');
   const [displayedDate, setDisplayedDate] = useState('');
   const [isNavbarHidden, setIsNavbarHidden] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
-  const currentNews = allNews[currentIndex];
-  const totalNews = allNews.length;
+  const currentNews = filteredNews[currentIndex];
+  const totalNews = filteredNews.length;
   
+  // 获取所有资讯
   useEffect(() => {
     setIsLoading(true);
-    fetch('/api/news?type=daily&sort=priority&limit=10')
+    fetch('/api/news?type=daily&sort=priority&limit=50')
       .then(res => res.json())
       .then(data => {
         if (data.success && data.data) {
           setAllNews(data.data as ExtendedNewsItem[]);
+          setFilteredNews(data.data as ExtendedNewsItem[]);
           
           const urlIndex = searchParams.get('index');
           if (urlIndex) {
@@ -78,6 +94,16 @@ function VideoPageContent() {
         setIsLoading(false);
       });
   }, [searchParams]);
+  
+  // 分类筛选
+  useEffect(() => {
+    if (selectedCategory) {
+      setFilteredNews(allNews.filter(n => n.category === selectedCategory));
+    } else {
+      setFilteredNews(allNews);
+    }
+    setCurrentIndex(0);
+  }, [selectedCategory, allNews]);
   
   const goToNext = useCallback(() => {
     if (currentIndex < totalNews - 1) {
@@ -117,7 +143,17 @@ function VideoPageContent() {
     return priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.B;
   };
   
+  const getCategoryStyle = (category: string) => {
+    return categoryConfig[category as keyof typeof categoryConfig] || categoryConfig['项目相关'];
+  };
+  
   const newsNumber = String(currentIndex + 1).padStart(2, '0');
+  
+  // 统计分类数量
+  const categoryCounts = allNews.reduce((acc, item) => {
+    acc[item.category] = (acc[item.category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
   
   if (isLoading) {
     return (
@@ -150,22 +186,16 @@ function VideoPageContent() {
   }
   
   const priority = getPriorityStyle(currentNews.priority);
+  const category = getCategoryStyle(currentNews.category);
+  const CategoryIcon = category.icon;
   
   return (
     <div className="video-page">
-      {/* 花瓣动画 */}
-      <div className="petals-container">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div
-            key={i}
-            className="petal"
-            style={{
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 10}s`,
-              animationDuration: `${10 + Math.random() * 8}s`,
-            }}
-          />
-        ))}
+      {/* 背景装饰 */}
+      <div className="video-bg-decoration">
+        <div className="bg-circle bg-circle-1" />
+        <div className="bg-circle bg-circle-2" />
+        <div className="bg-circle bg-circle-3" />
       </div>
       
       <div className="video-container">
@@ -182,27 +212,51 @@ function VideoPageContent() {
           </div>
           
           <div className="controls-center">
-            <button
-              onClick={() => setViewMode('summary')}
-              className={`view-btn ${viewMode === 'summary' ? 'active' : ''}`}
-            >
-              <Eye className="w-4 h-4" />
-              摘要
-            </button>
-            <button
-              onClick={() => setViewMode('detail')}
-              className={`view-btn ${viewMode === 'detail' ? 'active' : ''}`}
-            >
-              <FileText className="w-4 h-4" />
-              详情
-            </button>
+            {/* 分类筛选 */}
+            <div className="category-filter">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`filter-btn ${!selectedCategory ? 'active' : ''}`}
+              >
+                全部 ({allNews.length})
+              </button>
+              {Object.entries(categoryConfig).map(([cat, config]) => {
+                const Icon = config.icon;
+                const count = categoryCounts[cat] || 0;
+                if (count === 0) return null;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                    className={`filter-btn ${selectedCategory === cat ? 'active' : ''}`}
+                  >
+                    <Icon className="w-3 h-3" />
+                    {cat} ({count})
+                  </button>
+                );
+              })}
+            </div>
           </div>
           
           <div className="controls-right">
             <button
+              onClick={() => setViewMode('summary')}
+              className={`view-btn ${viewMode === 'summary' ? 'active' : ''}`}
+              title="摘要模式 (V)"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('detail')}
+              className={`view-btn ${viewMode === 'detail' ? 'active' : ''}`}
+              title="详情模式 (V)"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => router.push('/')}
               className="icon-btn"
-              title="返回首页"
+              title="返回首页 (Home)"
             >
               <Home className="w-4 h-4" />
             </button>
@@ -245,7 +299,7 @@ function VideoPageContent() {
         
         {/* 主内容 */}
         <main className="video-main">
-          {/* 头像 */}
+          {/* 头像区域 */}
           <div className="avatar-section">
             <div className="avatar-wrapper">
               <Image
@@ -257,47 +311,60 @@ function VideoPageContent() {
               />
             </div>
             <div className="avatar-label">新叶早报</div>
+            <div className="avatar-sublabel">AI资讯日报</div>
           </div>
           
           {/* 内容卡片 */}
           <div className="content-card">
             {viewMode === 'summary' ? (
               <div className="summary-view">
+                {/* 头部信息 */}
                 <div className="card-header">
-                  <span className="news-number">{newsNumber}</span>
-                  <span className={`priority-badge ${priority.bgColor} ${priority.textColor}`}>
-                    {priority.label}
-                  </span>
+                  <div className="header-left">
+                    <span className="news-number">{newsNumber}</span>
+                    <div className="header-tags">
+                      <span className={`priority-badge ${priority.bgColor} ${priority.textColor}`}>
+                        {priority.label}
+                      </span>
+                      <span className={`category-badge ${category.bg} ${category.color}`}>
+                        <CategoryIcon className="w-3 h-3" />
+                        {currentNews.category}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="source-tag">📰 {currentNews.source}</span>
                 </div>
                 
                 <div className="card-divider" />
                 
+                {/* 标题和摘要 */}
                 <h1 className="news-title">{currentNews.title}</h1>
                 <p className="news-summary">{currentNews.summary}</p>
-                
-                <div className="news-meta">
-                  <span className="meta-source">📰 {currentNews.source}</span>
-                  <span className="meta-category">{currentNews.category}</span>
-                </div>
               </div>
             ) : (
               <div className="detail-view">
+                {/* 头部信息 */}
                 <div className="card-header">
-                  <span className="news-number">{newsNumber}</span>
-                  <span className={`priority-badge ${priority.bgColor} ${priority.textColor}`}>
-                    {priority.label}
-                  </span>
+                  <div className="header-left">
+                    <span className="news-number">{newsNumber}</span>
+                    <div className="header-tags">
+                      <span className={`priority-badge ${priority.bgColor} ${priority.textColor}`}>
+                        {priority.label}
+                      </span>
+                      <span className={`category-badge ${category.bg} ${category.color}`}>
+                        <CategoryIcon className="w-3 h-3" />
+                        {currentNews.category}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="source-tag">📰 {currentNews.source}</span>
                 </div>
                 
                 <div className="card-divider" />
                 
                 <h1 className="news-title">{currentNews.title}</h1>
                 
-                <div className="news-meta">
-                  <span className="meta-source">📰 {currentNews.source}</span>
-                  <span className="meta-category">{currentNews.category}</span>
-                </div>
-                
+                {/* 核心事实 */}
                 {currentNews.core_facts && currentNews.core_facts.length > 0 && (
                   <div className="detail-section">
                     <h2 className="section-title">📌 核心事实</h2>
@@ -309,6 +376,7 @@ function VideoPageContent() {
                   </div>
                 )}
                 
+                {/* 关键数据 */}
                 {currentNews.key_data && currentNews.key_data.length > 0 && (
                   <div className="detail-section">
                     <h2 className="section-title">📊 关键数据</h2>
