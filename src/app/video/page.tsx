@@ -1,318 +1,415 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import Image from 'next/image';
-import '../video/video.css';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Home,
+  Calendar,
+  Eye,
+  FileText,
+  EyeOff,
+  Menu
+} from 'lucide-react';
+import { mockNews } from '@/lib/mockData';
+import type { NewsItem } from '@/lib/supabase';
+import './video.css';
 
-// 新闻项类型（适配API返回的数据结构）
-interface NewsItem {
-  id: string;
-  title: string;
-  summary: string;
-  source: string;
-  source_url?: string;
-  url?: string;
-  priority: 'SSS' | 'SS' | 'S' | 'A' | 'B';
-  category: string;
-  published_at: string;
+interface ExtendedNewsItem extends NewsItem {
+  core_facts?: string[];
+  key_data?: string[];
 }
 
-// 脚本格式（script模式显示）
-interface ScriptItem {
-  title: string;
-  script: string;
-  duration: number;
+type ViewMode = 'summary' | 'detail';
+
+const priorityConfig = {
+  SSS: { label: 'SSS', bgColor: 'bg-amber-500', textColor: 'text-amber-950' },
+  SS: { label: 'SS', bgColor: 'bg-pink-500', textColor: 'text-pink-950' },
+  S: { label: 'S', bgColor: 'bg-emerald-500', textColor: 'text-emerald-950' },
+  A: { label: 'A', bgColor: 'bg-blue-500', textColor: 'text-blue-950' },
+  B: { label: 'B', bgColor: 'bg-gray-500', textColor: 'text-gray-950' },
+};
+
+function formatDateDisplay(dateStr: string): string {
+  const date = new Date(dateStr);
+  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  return date.getFullYear() + '年' + (date.getMonth() + 1) + '月' + date.getDate() + '日 ' + weekdays[date.getDay()];
 }
 
-interface VideoPageProps {
-  searchParams: Promise<{
-    date?: string;
-    period?: string;
-    autoplay?: string;
-    script?: string;
-  }>;
-}
-
-export default function VideoPage({ searchParams }: VideoPageProps) {
-  const [currentNews, setCurrentNews] = useState<NewsItem[]>([]);
+function VideoPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  const [allNews, setAllNews] = useState<ExtendedNewsItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('summary');
   const [displayedDate, setDisplayedDate] = useState('');
-  const [periodLabel, setPeriodLabel] = useState('早报');
-  const [issueNumber, setIssueNumber] = useState(1);
-  const [autoplay, setAutoplay] = useState(false);
-  const [isScriptMode, setIsScriptMode] = useState(false);
-  const [scriptData, setScriptData] = useState<{ opening: string; closing: string; items: ScriptItem[] } | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [isNavbarHidden, setIsNavbarHidden] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // 从API获取新闻数据
-  const fetchNews = useCallback(async () => {
+  
+  const currentNews = allNews[currentIndex];
+  const totalNews = allNews.length;
+  
+  useEffect(() => {
     setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/news?sort=priority&limit=8');
-      const result = await response.json();
+    setTimeout(() => {
+      const extended = mockNews.map((news, idx) => ({
+        ...news,
+        core_facts: [
+          '核心事实1：这是第' + (idx + 1) + '条新闻的核心事实第一点，包含重要的背景信息和关键内容。',
+          '核心事实2：这是第' + (idx + 1) + '条新闻的核心事实第二点，补充说明相关影响和意义。',
+        ],
+        key_data: [
+          '数据指标1：性能提升约' + (40 + idx * 5) + '%（基于最新测试结果）',
+          '数据指标2：支持' + (128 + idx * 10) + 'K上下文窗口（行业领先水平）',
+        ],
+      })) as ExtendedNewsItem[];
       
-      if (result.success && result.data && result.data.length > 0) {
-        setCurrentNews(result.data);
-      } else {
-        setCurrentNews([]);
+      setAllNews(extended);
+      
+      const urlIndex = searchParams.get('index');
+      if (urlIndex) {
+        const idx = parseInt(urlIndex) - 1;
+        if (idx >= 0 && idx < extended.length) {
+          setCurrentIndex(idx);
+        }
       }
-    } catch (err) {
-      console.error('Failed to fetch news:', err);
-      setError('获取数据失败');
-      setCurrentNews([]);
-    } finally {
+      
+      const urlDate = searchParams.get('date');
+      setDisplayedDate(urlDate || new Date().toISOString().split('T')[0]);
+      
       setIsLoading(false);
-    }
-  }, []);
-
-  // 加载脚本模式数据（如果指定了日期）
-  const fetchScriptData = useCallback(async (date: string) => {
-    try {
-      const scriptUrl = `/AI早报/output/scripts/script_${date}.json`;
-      const response = await fetch(scriptUrl);
-      if (response.ok) {
-        const data = await response.json();
-        setScriptData(data);
-        if (data.items && data.items.length > 0) {
-          const newsFromScript: NewsItem[] = data.items.map((item: ScriptItem, idx: number) => ({
-            id: `script-${idx}`,
-            title: item.title,
-            summary: item.script,
-            source: '新叶早报',
-            priority: 'A',
-            category: 'AI资讯',
-            published_at: new Date().toISOString(),
-          }));
-          setCurrentNews(newsFromScript);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch script:', err);
-    }
-  }, []);
-
+    }, 300);
+  }, [searchParams]);
+  
+  const updateUrlParams = useCallback((index: number) => {
+    const params = new URLSearchParams();
+    if (displayedDate) params.set('date', displayedDate);
+    params.set('index', String(index + 1));
+    router.push('/video?' + params.toString(), { scroll: false });
+  }, [displayedDate, router]);
+  
+  const goToNext = useCallback(() => {
+    if (isAnimating || currentIndex >= totalNews - 1) return;
+    
+    setIsAnimating(true);
+    setIsTransitioning(true);
+    
+    setTimeout(() => {
+      setCurrentIndex(prev => prev + 1);
+      updateUrlParams(currentIndex + 1);
+      setIsAnimating(false);
+      
+      setTimeout(() => setIsTransitioning(false), 100);
+    }, 300);
+  }, [currentIndex, totalNews, isAnimating, updateUrlParams]);
+  
+  const goToPrev = useCallback(() => {
+    if (isAnimating || currentIndex <= 0) return;
+    
+    setIsAnimating(true);
+    setIsTransitioning(true);
+    
+    setTimeout(() => {
+      setCurrentIndex(prev => prev - 1);
+      updateUrlParams(currentIndex - 1);
+      setIsAnimating(false);
+      
+      setTimeout(() => setIsTransitioning(false), 100);
+    }, 300);
+  }, [currentIndex, isAnimating, updateUrlParams]);
+  
   useEffect(() => {
-    const initParams = async () => {
-      const p = await searchParams;
-      
-      if (p.date) {
-        setDisplayedDate(p.date);
-        if (p.script === 'true') {
-          setIsScriptMode(true);
-          await fetchScriptData(p.date);
-        }
-      } else {
-        const today = new Date();
-        setDisplayedDate(today.toISOString().split('T')[0]);
-      }
-      
-      if (p.period) {
-        if (p.period === 'morning') setPeriodLabel('早报');
-        else if (p.period === 'afternoon') setPeriodLabel('午报');
-        else if (p.period === 'evening') setPeriodLabel('晚报');
-      }
-      
-      if (p.autoplay === 'true') {
-        setAutoplay(true);
-      }
-      
-      if (p.script !== 'true') {
-        await fetchNews();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        goToNext();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goToPrev();
+      } else if (e.key === 'v' || e.key === 'V') {
+        setViewMode(prev => prev === 'summary' ? 'detail' : 'summary');
+      } else if (e.key === 'h' || e.key === 'H') {
+        setIsNavbarHidden(prev => !prev);
       }
     };
     
-    initParams();
-    
-    const startDate = new Date('2024-01-01');
-    const today = new Date();
-    const daysDiff = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    setIssueNumber(daysDiff);
-  }, [searchParams, fetchNews, fetchScriptData]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [goToNext, goToPrev]);
   
-  // 自动播放模式
-  useEffect(() => {
-    if (autoplay && currentNews.length > 0) {
-      const interval = setInterval(() => {
-        nextNews();
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [autoplay, currentIndex, currentNews.length]);
-  
-  const nextNews = () => {
-    if (isAnimating) return;
-    setIsAnimating(true);
-    setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % currentNews.length);
-      setIsAnimating(false);
-    }, 500);
-  };
-  
-  const prevNews = () => {
-    if (isAnimating) return;
-    setIsAnimating(true);
-    setTimeout(() => {
-      setCurrentIndex((prev) => (prev - 1 + currentNews.length) % currentNews.length);
-      setIsAnimating(false);
-    }, 500);
-  };
-  
-  // 格式化日期显示
-  const formatDateDisplay = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-  };
-  
-  // 优先级样式
   const getPriorityStyle = (priority: string) => {
-    const styles: Record<string, { bg: string; text: string }> = {
-      'SSS': { bg: 'bg-amber-500', text: 'text-amber-950' },
-      'SS': { bg: 'bg-pink-500', text: 'text-pink-950' },
-      'S': { bg: 'bg-emerald-500', text: 'text-emerald-950' },
-      'A': { bg: 'bg-blue-500', text: 'text-blue-950' },
-      'B': { bg: 'bg-gray-500', text: 'text-gray-950' },
-    };
-    return styles[priority] || styles['B'];
+    return priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.B;
   };
-
+  
+  const newsNumber = String(currentIndex + 1).padStart(2, '0');
+  
+  if (isLoading) {
+    return (
+      <div className="video-page">
+        <div className="video-container">
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center text-emerald-800">
+              <div className="animate-pulse mb-2 text-xl font-medium">加载中...</div>
+              <div className="text-sm text-emerald-600">正在准备视频素材</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!currentNews || totalNews === 0) {
+    return (
+      <div className="video-page">
+        <div className="video-container">
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <p className="text-xl text-emerald-800 mb-4">暂无数据</p>
+              <Link 
+                href="/"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                <Home className="w-4 h-4" />
+                返回首页
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  const priority = getPriorityStyle(currentNews.priority);
+  
   return (
     <div className="video-page">
-      {/* 花瓣飘落动画 - 浅粉色 */}
       <div className="petals-container">
-        {Array.from({ length: 20 }).map((_, i) => (
+        {Array.from({ length: 15 }).map((_, i) => (
           <div
             key={i}
             className="petal"
             style={{
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 10}s`,
-              animationDuration: `${8 + Math.random() * 7}s`,
+              left: Math.random() * 100 + '%',
+              animationDelay: Math.random() * 10 + 's',
+              animationDuration: (10 + Math.random() * 8) + 's',
             }}
           />
         ))}
       </div>
       
-      {/* 主内容 */}
       <div className="video-container">
-        {/* 顶部标题区 */}
-        <header className="video-header">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-300 shadow-lg">
+        <header className={'video-navbar ' + (isNavbarHidden ? 'hidden' : '')}>
+          <div className="navbar-content">
+            <Link href="/" className="nav-link nav-home">
+              <Home className="w-4 h-4" />
+              <span>首页</span>
+            </Link>
+            
+            <div className="nav-center">
+              <span className="nav-date flex items-center gap-1">
+                <Calendar className="w-4 h-4" />
+                {displayedDate ? formatDateDisplay(displayedDate) : formatDateDisplay(new Date().toISOString())}
+              </span>
+              <span className="nav-progress">
+                第 <span className="font-bold text-primary">{currentIndex + 1}</span> / <span className="font-bold">{totalNews}</span> 条
+              </span>
+            </div>
+            
+            <div className="nav-right">
+              <button
+                onClick={() => setViewMode('summary')}
+                className={'nav-view-btn ' + (viewMode === 'summary' ? 'active' : '')}
+                title="摘要模式 (V)"
+              >
+                <Eye className="w-4 h-4" />
+                <span>摘要</span>
+              </button>
+              <button
+                onClick={() => setViewMode('detail')}
+                className={'nav-view-btn ' + (viewMode === 'detail' ? 'active' : '')}
+                title="详情模式 (V)"
+              >
+                <FileText className="w-4 h-4" />
+                <span>详情</span>
+              </button>
+              <button
+                onClick={() => setIsNavbarHidden(true)}
+                className="nav-icon-btn"
+                title="隐藏导航栏 (H)"
+              >
+                <EyeOff className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          
+          {isNavbarHidden && (
+            <button
+              onClick={() => setIsNavbarHidden(false)}
+              className="show-navbar-btn"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+        </header>
+        
+        <button
+          onClick={goToPrev}
+          disabled={currentIndex <= 0}
+          className="nav-arrow nav-arrow-left"
+          title="上一条 (←)"
+        >
+          <ChevronLeft className="w-8 h-8" />
+        </button>
+        
+        <button
+          onClick={goToNext}
+          disabled={currentIndex >= totalNews - 1}
+          className="nav-arrow nav-arrow-right"
+          title="下一条 (→)"
+        >
+          <ChevronRight className="w-8 h-8" />
+        </button>
+        
+        <main className={'video-main ' + (isTransitioning ? 'transitioning' : '')}>
+          <div className="avatar-section">
+            <div className="avatar-container">
               <Image
                 src="/images/avatar-green.jpg"
                 alt="绿"
-                width={40}
-                height={40}
-                className="w-full h-full object-cover"
+                width={100}
+                height={100}
+                className="avatar-image"
               />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-emerald-800 drop-shadow-sm">
-                🌿 新叶{periodLabel}
-              </h1>
-              <p className="text-base text-emerald-700">
-                {formatDateDisplay(displayedDate)} · 第{issueNumber}期
-              </p>
+            <div className="avatar-label">
+              <span className="avatar-name">新叶早报</span>
             </div>
           </div>
-        </header>
-        
-        {/* 新闻列表区 */}
-        <main className="video-main">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full text-emerald-800">
-              <div className="text-center">
-                <div className="animate-pulse mb-2 text-lg">加载中...</div>
-                <div className="text-sm text-emerald-600">正在从Supabase获取数据</div>
-              </div>
-            </div>
-          ) : error ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center text-red-600 text-lg">{error}</div>
-            </div>
-          ) : currentNews.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-emerald-800">
-              <div className="text-center">
-                <p className="text-lg">暂无数据</p>
-                <p className="text-sm text-emerald-600 mt-2">请检查Supabase数据库</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* 脚本模式：显示开场白 */}
-              {isScriptMode && scriptData?.opening && currentIndex === 0 && (
-                <div className="script-intro mb-4 p-4 rounded-lg">
-                  <p className="text-emerald-900 text-lg font-medium leading-relaxed">{scriptData.opening}</p>
+          
+          <div className="content-section">
+            {viewMode === 'summary' && (
+              <div className="summary-card animate-fade-in">
+                <div className="summary-header">
+                  <span className="summary-number">{newsNumber}</span>
+                  <span className={'priority-badge ' + priority.bgColor + ' ' + priority.textColor}>
+                    {priority.label}
+                  </span>
                 </div>
-              )}
-            
-              {currentNews.map((news, index) => {
-                const priorityStyle = getPriorityStyle(news.priority);
-                const isActive = index === currentIndex;
-                const isVisible = index <= currentIndex + 1 && index >= currentIndex - 1;
                 
-                return (
-                  <div
-                    key={news.id}
-                    className={`news-item ${isActive ? 'active' : ''} ${isVisible ? 'visible' : 'hidden-news'}`}
-                  >
-                    {/* 序号 */}
-                    <div className="news-number">
-                      <span className={`${priorityStyle.bg} ${priorityStyle.text}`}>
-                        {index === currentIndex ? '▶' : index + 1}
-                      </span>
-                    </div>
-                    
-                    {/* 内容 */}
-                    <div className="news-content">
-                      <div className="news-title-row flex items-center gap-2 flex-wrap">
-                        <span className={`news-priority-badge ${priorityStyle.bg} ${priorityStyle.text} px-2 py-0.5 rounded text-xs font-bold`}>
-                          {news.priority}
-                        </span>
-                        <h2 className="news-title text-lg font-semibold text-gray-800">{news.title}</h2>
-                      </div>
-                      <p className="news-summary mt-2 text-gray-600 leading-relaxed">{news.summary}</p>
-                      <div className="news-meta mt-3 flex items-center gap-3 text-sm">
-                        <span className="news-source text-emerald-600 font-medium">📰 {news.source}</span>
-                        <span className="news-category px-2 py-0.5 rounded-full text-emerald-700 text-xs">{news.category}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            
-              {/* 脚本模式：显示结束语 */}
-              {isScriptMode && scriptData?.closing && currentIndex === currentNews.length - 1 && (
-                <div className="script-outro mt-4 p-4 rounded-lg">
-                  <p className="text-emerald-900 text-lg font-medium leading-relaxed">{scriptData.closing}</p>
+                <div className="summary-divider" />
+                
+                <h1 className="summary-title">{currentNews.title}</h1>
+                <p className="summary-text">{currentNews.summary}</p>
+                
+                <div className="summary-meta">
+                  <span className="meta-source">📰 {currentNews.source}</span>
+                  <span className="meta-category">{currentNews.category}</span>
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            )}
+            
+            {viewMode === 'detail' && (
+              <div className="detail-card animate-fade-in">
+                <div className="detail-header">
+                  <span className="detail-number">{newsNumber}</span>
+                  <span className={'priority-badge ' + priority.bgColor + ' ' + priority.textColor}>
+                    {priority.label}
+                  </span>
+                </div>
+                
+                <div className="detail-divider" />
+                
+                <h1 className="detail-title">{currentNews.title}</h1>
+                
+                <div className="detail-meta">
+                  <span className="meta-source">📰 {currentNews.source}</span>
+                  <span className="meta-category">{currentNews.category}</span>
+                </div>
+                
+                <section className="detail-section">
+                  <h2 className="section-title">
+                    <span className="section-icon">📌</span>
+                    核心事实
+                  </h2>
+                  <ul className="section-list">
+                    {currentNews.core_facts?.map((fact, idx) => (
+                      <li key={idx} className="section-item">
+                        <span className="item-bullet" />
+                        {fact}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+                
+                <section className="detail-section">
+                  <h2 className="section-title">
+                    <span className="section-icon">📊</span>
+                    关键数据
+                  </h2>
+                  <ul className="section-list">
+                    {currentNews.key_data?.map((data, idx) => (
+                      <li key={idx} className="section-item">
+                        <span className="item-bullet text-primary">·</span>
+                        {data}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </div>
+            )}
+          </div>
         </main>
         
-        {/* 底部来源标注 */}
-        <footer className="video-footer">
-          <div className="footer-content flex items-center justify-between">
-            <span className="text-sm">🌸 数据来源: 量子位 · 机器之心 · HackerNews</span>
-            <div className="footer-brand flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full overflow-hidden border border-emerald-300">
+        <footer className={'video-footer ' + (isNavbarHidden ? 'hidden' : '')}>
+          <div className="footer-content">
+            <span className="footer-title truncate flex-1 mr-4">
+              {currentNews.title}
+            </span>
+            <div className="footer-brand">
+              <div className="w-6 h-6 rounded-full overflow-hidden border border-emerald-300">
                 <Image
                   src="/images/avatar-green.jpg"
                   alt="绿"
-                  width={20}
-                  height={20}
+                  width={24}
+                  height={24}
                   className="w-full h-full object-cover"
                 />
               </div>
-              <span className="text-sm font-medium">新叶早报</span>
+              <span className="text-sm font-medium">🌿 新叶AI</span>
             </div>
           </div>
         </footer>
+        
+        <div className={'shortcuts-hint ' + (isNavbarHidden ? 'hidden' : '')}>
+          <span>← → 切换</span>
+          <span>V 切换视图</span>
+          <span>H 隐藏导航</span>
+        </div>
       </div>
     </div>
+  );
+}
+
+export default function VideoPage() {
+  return (
+    <Suspense fallback={
+      <div className="video-page">
+        <div className="video-container">
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center text-emerald-800">
+              <div className="animate-pulse mb-2 text-xl font-medium">加载中...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <VideoPageContent />
+    </Suspense>
   );
 }

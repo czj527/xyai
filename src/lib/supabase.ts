@@ -29,6 +29,7 @@ export interface DailyReport {
   created_at: string;
 }
 
+// 新闻项类型 - 支持结构化字段
 export interface NewsItem {
   id: string;
   title: string;
@@ -38,7 +39,17 @@ export interface NewsItem {
   priority: 'SSS' | 'SS' | 'S' | 'A' | 'B';
   category: string;
   published_at: string;
+  // 结构化字段（可选，由AI增强添加）
+  core_facts?: string[];        // 核心事实
+  key_data?: string[];          // 关键数据
+  related_links?: {              // 相关链接
+    title: string;
+    url: string;
+  }[];
 }
+
+// 兼容类型：旧版NewsItem（无结构化字段）
+export type LegacyNewsItem = Omit<NewsItem, 'core_facts' | 'key_data' | 'related_links'>;
 
 export interface WeeklyReport {
   id: string;
