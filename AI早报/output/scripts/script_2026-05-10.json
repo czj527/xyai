@@ -1,47 +1,47 @@
 {
-  "opening": "🌿 嘿！小伙伴们早上好！欢迎来到新叶早报~ 我是绿~ 2026年05月10日 周日，元气满满的一天从AI资讯开始！✨",
+  "opening": "大家好，欢迎收听新叶早报，今天是2026年5月10日星期日。",
   "items": [
     {
-      "title": "两项AI政策发布，范式智能战略布局与产业方向高度契合",
-      "script": "今天的第1条资讯是：两项AI政策发布，范式智能战略布局与产业方向高度契合。围绕电力交易、能源调度、智能预测与决策等场景探索AI应用落地...",
+      "title": "范式智能发布两项AI政策，布局能源场景",
+      "script": "范式智能今日发布两项AI政策，将AI技术嵌入电力交易、能源调度等核心场景。政策强调通过AI优化能源供需平衡，降低电网波动风险，提升绿色能源利用率。例如，在电力交易中，AI可实时分析天气和负荷数据，预测电价波动，辅助决策。这标志着AI从实验室走向产业深水区，推动能源行业数字化转型。🌿",
       "duration": 20
     },
     {
-      "title": "不更新参数就能强化学习！OpenAI翁家翌提出新范式：决策只需AI手搓一个.py 文件",
-      "script": "今天的第2条资讯是：不更新参数就能强化学习！OpenAI翁家翌提出新范式：决策只需AI手搓一个.py 文件。实现过程开源可复现...",
+      "title": "OpenAI提出无需更新参数的强化学习新范式",
+      "script": "OpenAI研究员翁家翌提出一种强化学习新范式，无需更新模型参数，仅通过编写Python文件即可优化AI决策。这一方法颠覆传统训练模式，降低开发门槛，适用于机器人控制或游戏AI等任务。背景是传统强化学习计算成本高、周期长，新范式有望提升边缘设备部署效率，推动轻量级AI应用普及。🌿",
       "duration": 20
     },
     {
-      "title": "谷歌「AI联合数学家」来了！刷新最难数学AI基准SOTA，牛津教授用它解开群论悬案",
-      "script": "今天的第3条资讯是：谷歌「AI联合数学家」来了！刷新最难数学AI基准SOTA，牛津教授用它解开群论悬案。谷歌AI for Math迈出最新一步...",
+      "title": "谷歌AI系统刷新数学基准，解决群论悬案",
+      "script": "谷歌AI系统“AI联合数学家”刷新最困难数学AI基准SOTA成绩，牛津大学教授利用其解开群论领域的长期悬案。这一进展源于谷歌“AI for Math”项目，旨在加速复杂证明过程。数学AI基准长期被视为推理能力试金石，此次突破意味着AI能涉足基础科学探索，可能促进科研领域渗透，加速新材料和密码学发现。🌿",
       "duration": 20
     },
     {
-      "title": "百度发布文心 5.1：搜索能力登顶国内，预训练成本仅为业界 6%",
-      "script": "今天的第4条资讯是：百度发布文心 5.1：搜索能力登顶国内，预训练成本仅为业界 6%。搜索、知识、Agent 能力全面提升...",
+      "title": "百度发布文心5.1，搜索能力登顶且成本低",
+      "script": "百度发布文心大模型5.1版本，搜索能力在国内评测中登顶，预训练成本仅为行业平均水平的6%。这一版本在知识整合和Agent能力上提升，支持多任务自动化。背景是大模型训练成本高昂，百度通过算法优化降低资源消耗，巩固中文搜索领先优势，推动AI模型向高效、低成本方向发展。🌿",
       "duration": 20
     },
     {
-      "title": "Running Codex safely at OpenAI",
-      "script": "今天的第5条资讯是：Running Codex safely at OpenAI。How OpenAI runs Codex securely with sandboxing, approvals, network policies, and agent-native teleme...",
+      "title": "OpenAI分享Codex安全运行框架",
+      "script": "OpenAI分享安全运行代码生成模型Codex的实践经验，通过沙盒隔离、审批流程、网络策略和遥测技术确保合规。背景是Codex普及带来安全风险，如代码漏洞或数据泄露。这一框架为行业提供可复制的安全范式，提升企业信任度，推动Codex在金融、医疗等高监管领域应用，促进AI安全标准制定。🌿",
       "duration": 20
     },
     {
-      "title": "Scaling Trusted Access for Cyber with GPT-5.5 and GPT-5.5-Cyber",
-      "script": "今天的第6条资讯是：Scaling Trusted Access for Cyber with GPT-5.5 and GPT-5.5-Cyber。OpenAI expands Trusted Access for Cyber with GPT-5.5 and GPT-5.5-Cyber, helping verified defenders a...",
+      "title": "OpenAI扩展可信网络访问计划，推出GPT-5.5",
+      "script": "OpenAI扩展“可信网络访问”计划，推出GPT-5.5和GPT-5.5-Cyber版本，专为认证防御者设计，加速漏洞研究和关键基础设施保护。这些模型通过增强网络安全能力，帮助识别系统弱点并提供防御建议。背景是网络攻击日益复杂，AI驱动漏洞研究成新趋势，此举旨在赋能合法防御方，重塑网络安全行业。🌿",
       "duration": 20
     },
     {
-      "title": "Simplex rethinks software development with Codex",
-      "script": "今天的第7条资讯是：Simplex rethinks software development with Codex。Simplex boosts software development with ChatGPT Enterprise and Codex, reducing design, build, and t...",
+      "title": "Simplex整合Codex重构软件开发流程",
+      "script": "软件公司Simplex通过整合ChatGPT Enterprise和Codex，重构软件开发流程，缩短设计、构建和测试时间，实现AI驱动工作流规模化。例如，Codex自动生成代码片段，ChatGPT辅助需求分析。背景是传统开发依赖人工迭代，成本高周期长，AI工具引入改变这一局面，推动软件行业自动化转型和协作演进。🌿",
       "duration": 20
     },
     {
-      "title": "太初元碁携龙虾一体机亮相北京科博会",
-      "script": "今天的第8条资讯是：太初元碁携龙虾一体机亮相北京科博会。...",
+      "title": "太初元碁在北京科博会展示龙虾一体机",
+      "script": "太初元碁在北京科博会上展示“龙虾一体机”，集成AI计算与边缘处理能力，专为工业物联网场景设计。设备通过高性能芯片和优化算法，实现实时数据分析与决策，适用于智能制造和智慧城市。背景是AI应用向边缘端延伸，一体机解决方案成行业热点，此举旨在填补国内高端AI硬件市场空白，促进AI硬件自主化。🌿",
       "duration": 20
     }
   ],
-  "closing": "🌿 以上就是今天的AI资讯啦！记得明天同一时间来看绿哦~ 我们明天见！拜拜~ 👋",
-  "total_duration": 185
+  "closing": "以上是今日早报，感谢收听。",
+  "total_duration": 180
 }
