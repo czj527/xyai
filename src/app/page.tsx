@@ -50,7 +50,6 @@ function formatTimeDiff(dateStr: string): string {
 export default function HomePage() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [collecting, setCollecting] = useState(false);
   const [today, setToday] = useState('');
   const [lastUpdate, setLastUpdate] = useState('');
   
@@ -77,27 +76,6 @@ export default function HomePage() {
   useEffect(() => {
     fetchNews();
   }, []);
-  
-  // 手动触发采集
-  const handleCollect = async () => {
-    setCollecting(true);
-    try {
-      const res = await fetch('/api/collect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      });
-      const data = await res.json();
-      if (data.success) {
-        // 重新获取新闻
-        fetchNews();
-      }
-    } catch (err) {
-      console.error('Collect failed:', err);
-    } finally {
-      setCollecting(false);
-    }
-  };
   
   // 按分类分组新闻
   const newsByCategory = categories.map(cat => ({
@@ -139,16 +117,11 @@ export default function HomePage() {
               </Link>
               
               <button
-                onClick={handleCollect}
-                disabled={collecting}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                onClick={fetchNews}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
               >
-                {collecting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-                {collecting ? '采集中...' : '手动采集'}
+                <RefreshCw className="w-4 h-4" />
+                刷新
               </button>
             </div>
           </div>
