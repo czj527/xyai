@@ -12,7 +12,6 @@ import {
   Clock,
   ExternalLink
 } from 'lucide-react';
-import { mockNews } from '@/lib/mockData';
 import type { NewsItem } from '@/lib/supabase';
 
 // 优先级配置
@@ -159,12 +158,20 @@ export default function HomePage() {
   
   useEffect(() => {
     setLoading(true);
-    setTimeout(() => {
-      setNews(mockNews);
-      const today = formatDateDisplay(new Date().toISOString());
-      setCurrentDate(today);
-      setLoading(false);
-    }, 300);
+    fetch('/api/news?type=daily&sort=priority&limit=50')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setNews(data.data);
+        }
+        const today = formatDateDisplay(new Date().toISOString());
+        setCurrentDate(today);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch news:', err);
+        setLoading(false);
+      });
   }, []);
   
   const hotspotNews = news.slice(0, 8);

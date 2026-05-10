@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   Link2
 } from 'lucide-react';
-import { mockNews } from '@/lib/mockData';
 import type { NewsItem } from '@/lib/supabase';
 
 interface ExtendedNewsItem extends NewsItem {
@@ -41,45 +40,39 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function getNewsIndex(newsId: string, allNews: NewsItem[]): number {
-  return allNews.findIndex(n => n.id === newsId);
-}
-
 export default function NewsDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [news, setNews] = useState<ExtendedNewsItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [total, setTotal] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [allNews, setAllNews] = useState<NewsItem[]>([]);
+  const [prevNews, setPrevNews] = useState<{id: string; title: string} | null>(null);
+  const [nextNews, setNextNews] = useState<{id: string; title: string} | null>(null);
   
   useEffect(() => {
     setLoading(true);
-    setTimeout(() => {
-      const all = mockNews;
-      setAllNews(all);
-      
-      const found = all.find(n => n.id === params.id);
-      if (found) {
-        const extended = found as ExtendedNewsItem;
-        extended.core_facts = extended.core_facts || [
-          '这是核心事实的第一点内容',
-          '这是核心事实的第二点内容',
-        ];
-        extended.key_data = extended.key_data || [
-          '关键数据项1',
-          '关键数据项2',
-        ];
-        extended.related_links = extended.related_links || [];
-        setNews(extended);
-        setCurrentIndex(getNewsIndex(found.id, all));
-      }
-      setLoading(false);
-    }, 300);
+    fetch(`/api/news/${params.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setNews(data.data as ExtendedNewsItem);
+          setTotal(data.total);
+          setCurrentIndex(data.index);
+          setPrevNews(data.prev);
+          setNextNews(data.next);
+        } else {
+          setError(true);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch news:', err);
+        setError(true);
+        setLoading(false);
+      });
   }, [params.id]);
-  
-  const prevNews = allNews[currentIndex - 1];
-  const nextNews = allNews[currentIndex + 1];
   
   const goToPrev = () => {
     if (prevNews) {
@@ -292,7 +285,7 @@ export default function NewsDetailPage() {
           </button>
           
           <span className="text-sm text-muted-foreground">
-            {currentIndex + 1} / {allNews.length}
+            {currentIndex + 1} / {total}
           </span>
           
           <button

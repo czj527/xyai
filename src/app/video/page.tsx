@@ -14,7 +14,6 @@ import {
   EyeOff,
   Menu
 } from 'lucide-react';
-import { mockNews } from '@/lib/mockData';
 import type { NewsItem } from '@/lib/supabase';
 import './video.css';
 
@@ -57,34 +56,30 @@ function VideoPageContent() {
   
   useEffect(() => {
     setIsLoading(true);
-    setTimeout(() => {
-      const extended = mockNews.map((news, idx) => ({
-        ...news,
-        core_facts: [
-          '核心事实1：这是第' + (idx + 1) + '条新闻的核心事实第一点，包含重要的背景信息和关键内容。',
-          '核心事实2：这是第' + (idx + 1) + '条新闻的核心事实第二点，补充说明相关影响和意义。',
-        ],
-        key_data: [
-          '数据指标1：性能提升约' + (40 + idx * 5) + '%（基于最新测试结果）',
-          '数据指标2：支持' + (128 + idx * 10) + 'K上下文窗口（行业领先水平）',
-        ],
-      })) as ExtendedNewsItem[];
-      
-      setAllNews(extended);
-      
-      const urlIndex = searchParams.get('index');
-      if (urlIndex) {
-        const idx = parseInt(urlIndex) - 1;
-        if (idx >= 0 && idx < extended.length) {
-          setCurrentIndex(idx);
+    fetch('/api/news?type=daily&sort=priority&limit=10')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          const newsData = data.data as ExtendedNewsItem[];
+          setAllNews(newsData);
+          
+          const urlIndex = searchParams.get('index');
+          if (urlIndex) {
+            const idx = parseInt(urlIndex) - 1;
+            if (idx >= 0 && idx < newsData.length) {
+              setCurrentIndex(idx);
+            }
+          }
+          
+          const urlDate = searchParams.get('date');
+          setDisplayedDate(urlDate || new Date().toISOString().split('T')[0]);
         }
-      }
-      
-      const urlDate = searchParams.get('date');
-      setDisplayedDate(urlDate || new Date().toISOString().split('T')[0]);
-      
-      setIsLoading(false);
-    }, 300);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch news:', err);
+        setIsLoading(false);
+      });
   }, [searchParams]);
   
   const updateUrlParams = useCallback((index: number) => {
